@@ -14,6 +14,7 @@ namespace protocol {
 		STOP_SONG          = 0x11,
 		RECORD_SONG        = 0x12,
 		NOW_PLAYING_INFO   = 0x13,
+		REPLAY_ANCHOR      = 0x14, // remote → base: replay section from last anchor to now; no payload
 
 		GET_SONG_LIST      = 0x20,
 		SONG_LIST_RESP     = 0x21,
@@ -21,6 +22,7 @@ namespace protocol {
 		SIGNAL_PLAYING     = 0x30,
 		SIGNAL_RECORDING   = 0x31,
 		SIGNAL_STOPPED     = 0x32,
+		SIGNAL_ANCHOR      = 0x33, // base → remote: named replay anchor reached; payload = null-terminated UTF-8 name
 
 		SET_CURRENT        = 0x40,
 
