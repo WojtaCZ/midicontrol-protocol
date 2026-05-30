@@ -29,6 +29,23 @@ namespace protocol {
 
 		KEEPALIVE          = 0x60,
 		KEEPALIVE_ACK      = 0x61,
+
+		// Firmware update (OTA over BLE for the remote, USB for the base)
+		FW_UPDATE_START    = 0x70, // payload: target(1) + size(4) + crc32(4) + version[...]
+		FW_UPDATE_DATA     = 0x71, // payload: offset(4) + chunk(<=120)
+		FW_UPDATE_END      = 0x72, // finalize + verify; device applies/reboots
+		FW_UPDATE_STATUS   = 0x73, // device -> PC progress / result
+		ENTER_BOOTLOADER   = 0x74, // base only: app reboots into its USB bootloader
+	};
+
+	// FW_UPDATE_STATUS payload codes (single byte)
+	enum class FwStatus : uint8_t {
+		READY      = 0x00, // ready to receive (response to FW_UPDATE_START)
+		IN_PROGRESS= 0x01,
+		CRC_OK     = 0x02, // image verified, will apply now
+		CRC_FAIL   = 0x03,
+		WRITE_ERROR= 0x04,
+		BAD_SIZE   = 0x05,
 	};
 
 	enum class NakReason : uint8_t {
