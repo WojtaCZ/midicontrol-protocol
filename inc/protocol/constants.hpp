@@ -31,12 +31,24 @@ namespace protocol {
 
 	// Velikosti
 	static constexpr uint8_t  MAX_PAYLOAD_SIZE = 128;
-	static constexpr uint16_t MAX_FRAME_SIZE   = 2 + (4 + MAX_PAYLOAD_SIZE + 1) * 2; // FRAME_START + worst-case escaped + FRAME_END
+	static constexpr uint16_t MAX_FRAME_SIZE   = 2 + (1 + 4 + MAX_PAYLOAD_SIZE + 1) * 2; // FRAME_START + worst-case escaped (Length + header + payload + CRC) + FRAME_END
 	static constexpr uint8_t  HEADER_SIZE      = 4; // Source + Dest + PacketID + MsgType
 
 	// Opakování a timeout
 	static constexpr uint8_t  MAX_RETRIES       = 3;
 	static constexpr uint16_t RETRY_TIMEOUT_MS   = 500;
+
+	// Keepalive: PC → Base a Base → Remote, protistrana je ztracena po KEEPALIVE_LOSS_MS bez odpovědi
+	static constexpr uint16_t KEEPALIVE_PERIOD_MS = 2000;
+	static constexpr uint16_t KEEPALIVE_LOSS_MS   = 6000;
+
+	// Kód písně v PLAY_SONG / SIGNAL_PLAYING: ASCII [0-9A-Z], např. "406A"
+	static constexpr uint8_t MAX_SONG_CODE_LEN = 8;
+
+	// NOW_PLAYING_INFO: hodnoty polí
+	static constexpr uint8_t NPI_NO_CHANGE = 0xFF; // pole se nemění
+	static constexpr uint8_t NPI_BLANK     = 0xFE; // pole zhasnout (číslo písně / sloka)
+	static constexpr uint8_t NPI_DIGIT_BLANK = 0x0F; // BCD nibble: prázdná číslice
 
 } // namespace protocol
 

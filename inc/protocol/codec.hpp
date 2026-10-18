@@ -13,7 +13,7 @@ namespace protocol {
 	// Dekóduje surový rámec (bez FRAME_START/FRAME_END) zpět na paket.
 	// raw ukazuje na data mezi FRAME_START a FRAME_END (escapovaná).
 	// Vrací true při úspěšné validaci CRC.
-	bool decodeFrame(const uint8_t *raw, uint8_t len, Packet &pkt);
+	bool decodeFrame(const uint8_t *raw, uint16_t len, Packet &pkt);
 
 } // namespace protocol
 

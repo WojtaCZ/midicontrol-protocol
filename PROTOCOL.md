@@ -19,16 +19,20 @@ Bytes `0x01` (SOH), `0x04` (EOT), `0x1B` (ESC), `0x24` ($), `0x25` (%) inside th
 | 0x24 ($) | ESC 0x26        |
 | 0x25 (%) | ESC 0x27        |
 
-## Header (4 bytes, unescaped meaning)
+## Frame content (unescaped)
 
-| Offset | Field      | Size |
-|--------|------------|------|
-| 0      | Source     | 1 B  |
-| 1      | Dest       | 1 B  |
-| 2      | PacketId   | 1 B  |
-| 3      | MsgType    | 1 B  |
+| Offset | Field    | Size     | Notes |
+|--------|----------|----------|-------|
+| 0      | Length   | 1 B      | `4 + payloadLen` (header + payload, excludes itself and CRC) |
+| 1      | Source   | 1 B      | |
+| 2      | Dest     | 1 B      | |
+| 3      | PacketId | 1 B      | one 8-bit counter per node, shared by all messages it sends |
+| 4      | MsgType  | 1 B      | |
+| 5..    | Payload  | 0–128 B  | |
+| last   | CRC-8    | 1 B      | CRC-8/MAXIM (poly 0x31, init 0x00) over Length..Payload |
 
-Followed by 0–128 bytes of payload. Final byte after payload: CRC-8 over the unescaped header + payload.
+Escaping applies to Length through CRC. Worst case on the wire is `2 + 134 * 2 = 270` bytes
+(`MAX_FRAME_SIZE`). Receivers must bounds-check the unescaped length; frames that do not fit are dropped.
 
 ## Node addresses
 
@@ -41,6 +45,32 @@ Followed by 0–128 bytes of payload. Final byte after payload: CRC-8 over the u
 
 ---
 
+## Routing
+
+- The **base forwards by destination**: a frame from USB whose `Dest` is the remote goes out over BLE,
+  a frame from BLE whose `Dest` is the PC goes out over USB-CDC. Only `Dest = Base` is handled locally.
+- The **remote addresses the PC directly** for playback and song-list commands (`PLAY_SONG`, `STOP_SONG`,
+  `REPLAY_ANCHOR`, `GET_SONG_LIST`). The PC is the player; the base holds no song data.
+- The **PC sends playback signals to the remote** (`SIGNAL_*`). The base may observe signals it forwards to
+  keep its own OLED in step, but it does not consume them.
+- If the base cannot forward (BLE link down, PC not enumerated) it answers the sender with
+  `NAK UNREACHABLE` so the sender stops retrying.
+
+## Reliability
+
+- ACKs are **end to end**: the destination node ACKs, the base never ACKs a frame it only forwards.
+- Every message requires `ACK` or `NAK` **except** `ACK`, `NAK`, `KEEPALIVE`, `KEEPALIVE_ACK`,
+  `NOW_PLAYING_INFO` and broadcasts. A response message (e.g. `SONG_LIST_RESP`, `STATUS_RESP`) is sent
+  in addition to the ACK of the request.
+- The sender retransmits the **same PacketId** after `RETRY_TIMEOUT_MS` (500 ms), at most `MAX_RETRIES` (3)
+  times. A receiver that sees the same `(Source, PacketId)` as the previous frame ACKs it again but does not
+  execute it twice.
+- Unknown `MsgType` is answered with `NAK UNKNOWN_MSG`, a bad payload with `NAK INVALID_PAYLOAD`.
+- `KEEPALIVE` is sent every 2 s by the PC to the base and by the base to the remote; the peer answers
+  `KEEPALIVE_ACK`. A peer is considered lost after 6 s without an answer.
+
+---
+
 ## Message types
 
 ### Acknowledgement (0x0x)
@@ -50,64 +80,87 @@ Followed by 0–128 bytes of payload. Final byte after payload: CRC-8 over the u
 | ACK  | 0x01 | any → any     | `[ackedPacketId]`                           |
 | NAK  | 0x02 | any → any     | `[ackedPacketId, nakReason]`                |
 
-NAK reasons: `0x01` unknown msg, `0x02` invalid payload, `0x03` CRC error, `0x04` busy.
+NAK reasons: `0x01` unknown msg, `0x02` invalid payload, `0x03` CRC error, `0x04` busy, `0x05` not playing, `0x06` unreachable (base could not forward), `0x07` not found (unknown song code).
 
 ---
 
-### Playback commands (0x1x) — Remote → Base or PC → Base
+### Playback commands (0x1x)
 
-| Type          | Code | Payload                                                    |
-|---------------|------|------------------------------------------------------------|
-| PLAY_SONG     | 0x10 | `[codeLo, codeHi]` — 16-bit song code, little-endian      |
-| STOP_SONG     | 0x11 | `[mode]` — `0x00` stop, `0x01` pause                      |
-| RECORD_SONG   | 0x12 | *(reserved)*                                               |
-| NOW_PLAYING_INFO | 0x13 | *(reserved)*                                            |
-| REPLAY_ANCHOR | 0x14 | *(empty)* — replay the section between the last two anchors |
+| Type             | Code | Direction       | Payload |
+|------------------|------|-----------------|---------|
+| PLAY_SONG        | 0x10 | Remote/Base → PC | ASCII song code, 1–8 chars `[0-9A-Z]`, e.g. `"406A"`. No terminator required; a trailing `0x00` is tolerated |
+| STOP_SONG        | 0x11 | Remote/Base → PC | *(empty)* or `[mode]`: `0x00` stop, `0x01` pause (the PC may treat pause as stop) |
+| RECORD_SONG      | 0x12 | –               | *(reserved)* |
+| NOW_PLAYING_INFO | 0x13 | PC → Base       | see below |
+| REPLAY_ANCHOR    | 0x14 | Remote → PC     | *(empty)* — **add verse** |
 
-**REPLAY_ANCHOR** instructs the base to jump back to the position of the most recently received anchor and replay forward to the current playback position. Intended for live services: when a speaker runs long, the operator presses the designated key repeatedly to loop the current musical section.
+The song code is also the file name on the PC (`406A.mid`). A 16-bit number is not used because it cannot
+express letter variants (406A / 406B). The PC answers an unknown code with `NAK NOT_FOUND`.
 
----
+**REPLAY_ANCHOR (add verse)** means "play one more verse": the current verse is played to its end, then
+played once more before playback continues. Each press adds one extra pass; presses accumulate.
+The PC answers `NAK NOT_PLAYING` when nothing is playing.
 
-### Song list (0x2x) — Remote/PC ↔ Base
+**NOW_PLAYING_INFO** drives the church indicator through the base. Not ACKed.
 
-| Type          | Code | Payload              |
-|---------------|------|----------------------|
-| GET_SONG_LIST | 0x20 | *(empty)*            |
-| SONG_LIST_RESP| 0x21 | *(TBD)*              |
+| Byte | Field   | Encoding |
+|------|---------|----------|
+| 0    | song_h  | BCD, digits 3 and 2 (high nibble = leftmost digit) |
+| 1    | song_l  | BCD, digits 1 and 0 |
+| 2    | verse   | BCD, tens and units |
+| 3    | letter  | `0x0A`–`0x0D` = A–D, `0x0F` = none |
+| 4    | led     | `0x00`/`0x0F` off, `0x01` red, `0x02` green, `0x03` blue, `0x04` yellow |
 
----
-
-### Playback signals (0x3x) — Base → Remote
-
-| Type             | Code | Payload                                                   |
-|------------------|------|-----------------------------------------------------------|
-| SIGNAL_PLAYING   | 0x30 | *(empty)*                                                 |
-| SIGNAL_RECORDING | 0x31 | *(empty)*                                                 |
-| SIGNAL_STOPPED   | 0x32 | *(empty)*                                                 |
-| SIGNAL_ANCHOR    | 0x33 | null-terminated UTF-8 string, max 127 bytes + `\0`        |
-
-**SIGNAL_ANCHOR** is sent by the base whenever playback crosses a named anchor point in a song. The remote displays the anchor name and enables the replay function. Anchors are defined in the song data on the PC/base side; the remote has no knowledge of their positions.
-
-Example anchor names: `"Verse 1"`, `"Chorus"`, `"Bridge"`, `"Interlude"`.
-
-The remote ACKs this message. If no anchor has been received since playback started, REPLAY_ANCHOR is silently ignored by the base.
+- A BCD nibble `0xF` is a **blank digit**, so digits are shown exactly where they are placed
+  (`" 401"` = `0xF4 0x01`, `"513 "` = `0x51 0x3F`, verse `"1 "` = `0x1F`).
+- `0xFF` in a field means **no change**. For the song, it is unchanged only when **both** `song_h` and `song_l`
+  are `0xFF`, so a short number such as `"  12"` (`0xFF 0x12`) is still expressible.
+- `0xFE` in `song_h` (with any `song_l`) or in `verse` **blanks** that field (e.g. verse blank during the prelude).
+- An **empty payload clears** the whole indicator (all digits blank, no letter, LED off).
 
 ---
 
-### Current position (0x4x)
+### Song list (0x2x)
 
-| Type        | Code | Payload   |
-|-------------|------|-----------|
-| SET_CURRENT | 0x40 | *(TBD)*   |
+| Type           | Code | Direction              | Payload |
+|----------------|------|------------------------|---------|
+| GET_SONG_LIST  | 0x20 | Remote/Base → PC       | *(empty)* or `[offset]` — index of the first entry, default 0 |
+| SONG_LIST_RESP | 0x21 | PC → requester         | `[hasMore, "code;code;..."]` — ASCII codes separated by `;`, no terminator |
+
+The PC fills a page up to the payload limit; the requester asks for the next page with
+`offset = previous offset + entries received` while `hasMore != 0`.
+
+---
+
+### Playback signals (0x3x) — PC → Remote
+
+| Type             | Code | Payload |
+|------------------|------|---------|
+| SIGNAL_PLAYING   | 0x30 | ASCII song code that started playing |
+| SIGNAL_RECORDING | 0x31 | *(reserved)* |
+| SIGNAL_STOPPED   | 0x32 | *(empty)* — playback ended or was stopped |
+| SIGNAL_ANCHOR    | 0x33 | null-terminated ASCII label, max 127 bytes + `\0` |
+
+**SIGNAL_ANCHOR** is sent every time playback enters a new section, e.g. `"Predehra"` (prelude),
+`"Sloka 2"`, or `"Sloka 2 +1"` while add-verse repeats are pending. Labels are ASCII so a small OLED
+font can draw them. The remote enables the add-verse key after the first anchor.
+
+---
+
+### Organ power (0x4x) — PC/Remote → Base
+
+| Type        | Code | Payload |
+|-------------|------|---------|
+| SET_CURRENT | 0x40 | `[on]` — `0x01` switch the SSR (organ mains) on, `0x00` off |
 
 ---
 
 ### Status (0x5x)
 
-| Type        | Code | Payload   |
-|-------------|------|-----------|
+| Type        | Code | Payload |
+|-------------|------|---------|
 | GET_STATUS  | 0x50 | *(empty)* |
-| STATUS_RESP | 0x51 | *(TBD)*   |
+| STATUS_RESP | 0x51 | `[bleConnected, ssrOn, displayConnected, pcAlive]`, one byte each, `0`/`1` |
 
 ---
 
@@ -118,11 +171,11 @@ The remote ACKs this message. If no anchor has been received since playback star
 | KEEPALIVE     | 0x60 | *(empty)* |
 | KEEPALIVE_ACK | 0x61 | *(empty)* |
 
-Sent by the base periodically. Remote replies with KEEPALIVE_ACK; no ACK/NAK otherwise.
+PC → Base and Base → Remote every 2 s; the receiver answers `KEEPALIVE_ACK`. Neither is ACKed.
 
 ---
 
-### Firmware update (0x7x) — PC → Remote
+### Firmware update (0x7x) — PC → Base or Remote
 
 | Type             | Code | Payload                                              |
 |------------------|------|------------------------------------------------------|
@@ -130,6 +183,13 @@ Sent by the base periodically. Remote replies with KEEPALIVE_ACK; no ACK/NAK oth
 | FW_UPDATE_DATA   | 0x71 | `[offset(4 LE), chunk(≤120 B)]`                     |
 | FW_UPDATE_END    | 0x72 | *(empty)* — finalize, verify, apply                  |
 | FW_UPDATE_STATUS | 0x73 | `[statusCode]` — device → PC progress/result         |
-| ENTER_BOOTLOADER | 0x74 | *(empty)* — base reboots into USB DFU bootloader     |
+| ENTER_BOOTLOADER | 0x74 | *(empty)* — base reboots into its USB-CDC bootloader |
 
 FW_UPDATE_STATUS codes: `0x00` ready, `0x01` in-progress, `0x02` CRC OK (applying), `0x03` CRC fail, `0x04` write error, `0x05` bad size.
+
+The base updates over **USB-CDC** with this custom protocol, not USB DFU: the app handles
+`ENTER_BOOTLOADER`, sets a magic word in a TAMP backup register and resets into the bootloader.
+`FW_UPDATE_DATA` chunks for the base must be a **multiple of 8 bytes** (flash double-word programming),
+except the last one, which the bootloader pads with `0xFF`. The remote stages the image in its external
+flash; `FW_UPDATE_START` may take several seconds there (sector erase), so the PC should wait up to 15 s
+for the first `FW_UPDATE_STATUS`.

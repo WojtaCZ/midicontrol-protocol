@@ -36,6 +36,7 @@ namespace protocol {
 
 	uint16_t encode(const Packet &pkt, uint8_t *output) {
 		uint16_t pos = 0;
+		if (pkt.payloadLen > MAX_PAYLOAD_SIZE) return 0; // Neplatný paket, nic neodesílat
 
 		// Sestavení neescapovaného obsahu pro CRC výpočet
 		uint8_t length = HEADER_SIZE + pkt.payloadLen;
@@ -48,7 +49,7 @@ namespace protocol {
 		for (uint8_t i = 0; i < pkt.payloadLen; ++i) {
 			raw[5 + i] = pkt.payload[i];
 		}
-		uint8_t rawLen = 1 + HEADER_SIZE + pkt.payloadLen;
+		uint8_t rawLen = static_cast<uint8_t>(1 + HEADER_SIZE + pkt.payloadLen);
 		uint8_t checksum = crc8(raw, rawLen);
 
 		// Zápis rámce
@@ -67,12 +68,14 @@ namespace protocol {
 		return pos;
 	}
 
-	bool decodeFrame(const uint8_t *raw, uint8_t len, Packet &pkt) {
+	bool decodeFrame(const uint8_t *raw, uint16_t len, Packet &pkt) {
 		// Nejdříve un-stuff celý obsah
-		uint8_t unstuffed[1 + HEADER_SIZE + MAX_PAYLOAD_SIZE + 1]; // Length + header + payload + CRC
-		uint8_t uLen = 0;
+		static constexpr uint16_t MAX_UNSTUFFED = 1 + HEADER_SIZE + MAX_PAYLOAD_SIZE + 1; // Length + header + payload + CRC
+		uint8_t unstuffed[MAX_UNSTUFFED];
+		uint16_t uLen = 0;
 
-		for (uint8_t i = 0; i < len; ++i) {
+		for (uint16_t i = 0; i < len; ++i) {
+			if (uLen >= MAX_UNSTUFFED) return false; // Příliš dlouhý rámec
 			if (raw[i] == ESC) {
 				if (i + 1 >= len) return false;
 				int val = unstuffByte(raw[++i]);
@@ -87,12 +90,12 @@ namespace protocol {
 		if (uLen < 6) return false;
 
 		uint8_t length = unstuffed[0];
-		uint8_t payloadLen = length - HEADER_SIZE;
 
 		// Kontrola konzistence
 		if (length < HEADER_SIZE) return false;
+		uint8_t payloadLen = static_cast<uint8_t>(length - HEADER_SIZE);
 		if (payloadLen > MAX_PAYLOAD_SIZE) return false;
-		if (uLen != static_cast<uint8_t>(1 + length + 1)) return false; // Length byte + content + CRC
+		if (uLen != 1u + length + 1u) return false; // Length byte + content + CRC
 
 		// CRC kontrola: přes Length .. Payload (vše kromě posledního bajtu = CRC)
 		uint8_t expectedCrc = crc8(unstuffed, uLen - 1);
