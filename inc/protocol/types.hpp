@@ -38,6 +38,10 @@ namespace protocol {
 		FW_UPDATE_END      = 0x72, // finalize + verify; device applies/reboots
 		FW_UPDATE_STATUS   = 0x73, // device -> PC progress / result
 		ENTER_BOOTLOADER   = 0x74, // base only: app reboots into its USB bootloader
+
+		// Diagnostics (see protocol/diag.hpp)
+		DIAG_GET           = 0x80, // PC → node: payload [cursor u16 LE]; ACKed
+		DIAG_RESP          = 0x81, // node → PC: [boot_id u16, next_cursor u16, n u8, n × 12 B record], n ≤ 8
 	};
 
 	// FW_UPDATE_STATUS payload codes (single byte)

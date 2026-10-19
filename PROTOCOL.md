@@ -193,3 +193,58 @@ The base updates over **USB-CDC** with this custom protocol, not USB DFU: the ap
 except the last one, which the bootloader pads with `0xFF`. The remote stages the image in its external
 flash; `FW_UPDATE_START` may take several seconds there (sector erase), so the PC should wait up to 15 s
 for the first `FW_UPDATE_STATUS`.
+
+---
+
+### Diagnostics (0x8x) — PC → node, node → PC
+
+| Type      | Code | Direction     | Payload |
+|-----------|------|---------------|---------|
+| DIAG_GET  | 0x80 | PC → node     | `[cursor u16 LE]` — ACKed |
+| DIAG_RESP | 0x81 | node → PC     | `[boot_id u16 LE, next_cursor u16 LE, n u8, n × record]`, `n` ≤ 8 (≤ 101 B) — sent in addition to the ACK, like `STATUS_RESP` |
+
+The node keeps a ring of diagnostic records (see `inc/protocol/diag.hpp`). `DIAG_GET` asks for the records whose
+`seq` is at or after `cursor`; the response carries up to 8 of them and `next_cursor` (the `seq` after the last
+record returned, or the node's next `seq` when nothing is new). `boot_id` changes on every boot of the node, so the
+PC can tell a reset from a cursor wrap and restarts at cursor 0 when it changes. Records the ring has already
+overwritten are skipped; the node then inserts a `RECORDS_LOST` record with the number dropped.
+
+**Record** — 12 B, little-endian:
+
+| Offset | Field     | Size | Notes |
+|--------|-----------|------|-------|
+| 0      | seq       | u16  | increments per record since boot |
+| 2      | code      | u8   | table below |
+| 3      | level     | u8   | `1` error, `2` warning, `3` info, `4` debug |
+| 4      | uptime_ms | u32  | ms since boot |
+| 8      | arg       | u32  | meaning depends on `code` |
+
+**Codes**
+
+| Code | Name              | arg |
+|------|-------------------|-----|
+| 1    | BOOT              | reset cause |
+| 2    | FAULT             | fault kind (node specific) |
+| 3    | FAULT_DETAIL      | follows FAULT: pc, lr, xpsr, ipsr as four records |
+| 4    | LOOP_STALL        | pc of the stuck main loop |
+| 5    | IWDG_RESET        | – |
+| 6    | BLE_CONNECT       | – |
+| 7    | BLE_DISCONNECT    | – |
+| 8    | BLE_SECURED       | – |
+| 9    | LINK_LOST         | – |
+| 10   | RETRIES_EXHAUSTED | msgType of the frame that was dropped |
+| 11   | CRC_ERRORS        | count |
+| 12   | CHARGER_FAULT     | charger REG09 |
+| 13   | LOW_BATTERY       | mV |
+| 14   | OTA_RESULT        | FwStatus |
+| 15   | SHUTDOWN          | reason |
+| 16   | RECORDS_LOST      | number of records dropped |
+
+**Polling rule (PC).** Send `DIAG_GET` when the node's link comes up and then every 10 s while it is alive; never
+during a firmware update; once a response carries `n = 0`, ask again only on the next timer tick. Use the previous
+`next_cursor` as the cursor (0 on the first request and after a `boot_id` change).
+
+**Old firmware** does not know `0x80` and answers `NAK UNKNOWN_MSG (0x01)`. The PC then stops polling that node
+until it reconnects.
+
+The base forwards both messages like any other frame (`Dest` = PC or Remote); the router needs no change.
