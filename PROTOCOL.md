@@ -225,7 +225,7 @@ overwritten are skipped; the node then inserts a `RECORDS_LOST` record with the 
 |------|-------------------|-----|
 | 1    | BOOT              | reset cause |
 | 2    | FAULT             | fault kind (node specific) |
-| 3    | FAULT_DETAIL      | follows FAULT: pc, lr, xpsr, ipsr as four records |
+| 3    | FAULT_DETAIL      | follows FAULT or LOOP_STALL: pc, lr, xpsr, ipsr as four records |
 | 4    | LOOP_STALL        | pc of the stuck main loop |
 | 5    | IWDG_RESET        | – |
 | 6    | BLE_CONNECT       | – |
