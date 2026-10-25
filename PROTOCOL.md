@@ -161,6 +161,14 @@ font can draw them. The remote enables the add-verse key after the first anchor.
 |-------------|------|---------|
 | GET_STATUS  | 0x50 | *(empty)* |
 | STATUS_RESP | 0x51 | `[bleConnected, ssrOn, displayConnected, pcAlive]`, one byte each, `0`/`1` |
+| GET_INFO    | 0x52 | *(empty)* — PC → Base or Remote, ACKed |
+| INFO_RESP   | 0x53 | TLV fields `[tag, len, value[len]]...` — node → PC, sent in addition to the ACK like `STATUS_RESP` |
+
+`INFO_RESP` carries firmware and device details for the PC's status page (tags in `inc/protocol/info.hpp`):
+revision, branch, build time, dirty flag, uptime, reset cause, fault count, Bluetooth state flags, peer address,
+device name, pairing state, and node-specific fields (base: display, SSR; remote: battery voltage and level,
+charger state, USB voltage). Values are little-endian. Every field is optional and a receiver skips unknown tags,
+so new fields need no new message type. A node without `GET_INFO` (older firmware) answers `NAK UNKNOWN_MSG`.
 
 ---
 

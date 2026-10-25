@@ -28,6 +28,8 @@ namespace protocol {
 
 		GET_STATUS         = 0x50,
 		STATUS_RESP        = 0x51,
+		GET_INFO           = 0x52, // PC → node: empty; ACKed, answered with INFO_RESP
+		INFO_RESP          = 0x53, // node → PC: TLV fields (see protocol/info.hpp)
 
 		KEEPALIVE          = 0x60,
 		KEEPALIVE_ACK      = 0x61,
