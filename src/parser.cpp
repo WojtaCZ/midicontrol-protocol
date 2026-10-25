@@ -10,31 +10,31 @@ namespace protocol {
 					_state = State::RECEIVING;
 					_bufferIndex = 0;
 				}
-				// Ostatní bajty mimo rámec ignorujeme
+				// Ignore other bytes outside a frame
 				return false;
 
 			case State::RECEIVING:
 				if (byte == FRAME_END) {
 					_state = State::IDLE;
-					// Zkusíme dekódovat obsah bufferu
+					// Try to decode the buffer contents
 					if (_bufferIndex > 0 && decodeFrame(_buffer, _bufferIndex, _packet)) {
 						return true;
 					}
-					// Neplatný rámec — zahodíme
+					// Invalid frame — discard it
 					return false;
 				}
 
 				if (byte == FRAME_START) {
-					// Nový rámec začíná — zahodíme rozpracovaný
+					// A new frame is starting — discard the one in progress
 					_bufferIndex = 0;
 					return false;
 				}
 
-				// Normální datový bajt
+				// Normal data byte
 				if (_bufferIndex < MAX_FRAME_SIZE) {
 					_buffer[_bufferIndex++] = byte;
 				} else {
-					// Přetečení — resetujeme
+					// Overflow — reset
 					_state = State::IDLE;
 					_bufferIndex = 0;
 				}

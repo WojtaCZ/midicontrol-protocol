@@ -4,12 +4,12 @@
 #include <cstddef>
 #include <cstdint>
 
-// Diagnostické záznamy v DIAG_RESP (jen hlavičky, bez závislostí).
+// Diagnostic records in DIAG_RESP (headers only, no dependencies).
 //
-// Záznam na drátě, 12 B, little-endian:
+// Record on the wire, 12 B, little-endian:
 //   seq u16, code u8, level u8, uptimeMs u32, arg u32
 // DIAG_GET  payload: [cursor u16 LE]
-// DIAG_RESP payload: [boot_id u16 LE, next_cursor u16 LE, n u8, n × záznam], n <= MAX_RECORDS
+// DIAG_RESP payload: [boot_id u16 LE, next_cursor u16 LE, n u8, n × record], n <= MAX_RECORDS
 
 namespace protocol::diag {
 
@@ -27,22 +27,22 @@ namespace protocol::diag {
 	};
 
 	enum class Code : uint8_t {
-		BOOT             = 1,  // arg = příčina resetu
-		FAULT            = 2,  // arg = druh chyby (podle uzlu), pc je v FAULT_DETAIL
-		FAULT_DETAIL     = 3,  // pc, lr, xpsr, ipsr následují jako záznamy tohoto kódu
-		LOOP_STALL       = 4,  // arg = pc zaseknuté hlavní smyčky
+		BOOT             = 1,  // arg = reset cause
+		FAULT            = 2,  // arg = fault kind (node-specific), pc is in FAULT_DETAIL
+		FAULT_DETAIL     = 3,  // pc, lr, xpsr, ipsr follow as records of this code
+		LOOP_STALL       = 4,  // arg = pc of the stalled main loop
 		IWDG_RESET       = 5,
 		BLE_CONNECT      = 6,
 		BLE_DISCONNECT   = 7,
 		BLE_SECURED      = 8,
 		LINK_LOST        = 9,
 		RETRIES_EXHAUSTED = 10, // arg = msgType
-		CRC_ERRORS       = 11, // arg = počet
+		CRC_ERRORS       = 11, // arg = count
 		CHARGER_FAULT    = 12, // arg = charger REG09
 		LOW_BATTERY      = 13, // arg = mV
 		OTA_RESULT       = 14, // arg = FwStatus
-		SHUTDOWN         = 15, // arg = důvod
-		RECORDS_LOST     = 16, // arg = počet ztracených záznamů
+		SHUTDOWN         = 15, // arg = reason
+		RECORDS_LOST     = 16, // arg = number of lost records
 	};
 
 	enum class Level : uint8_t { ERROR = 1, WARNING = 2, INFO = 3, DEBUG = 4 };

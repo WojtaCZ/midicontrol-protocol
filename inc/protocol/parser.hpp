@@ -9,19 +9,19 @@ namespace protocol {
 
 	class Parser {
 	public:
-		// Přijme jeden bajt z linky. Vrací true, když je kompletní rámec připraven.
+		// Accepts one byte from the line. Returns true when a complete frame is ready.
 		bool feed(uint8_t byte);
 
-		// Vrátí naposledy přijatý a dekódovaný paket.
+		// Returns the most recently received and decoded packet.
 		const Packet &getPacket() const { return _packet; }
 
-		// Reset parseru do výchozího stavu
+		// Resets the parser to its initial state
 		void reset();
 
 	private:
 		enum class State : uint8_t {
-			IDLE,       // Čekání na FRAME_START
-			RECEIVING,  // Příjem dat mezi FRAME_START a FRAME_END
+			IDLE,       // Waiting for FRAME_START
+			RECEIVING,  // Receiving data between FRAME_START and FRAME_END
 		};
 
 		State _state = State::IDLE;

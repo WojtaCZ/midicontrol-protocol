@@ -4,7 +4,7 @@
 
 namespace protocol {
 
-	// Zapíše escapovaný bajt do výstupního bufferu, vrátí počet zapsaných bajtů
+	// Writes an escaped byte to the output buffer, returns the number of bytes written
 	static uint16_t stuffByte(uint8_t byte, uint8_t *out) {
 		switch (byte) {
 			case FRAME_START:
@@ -22,7 +22,7 @@ namespace protocol {
 		}
 	}
 
-	// Vrátí originální bajt z escape sekvence, nebo -1 při chybě
+	// Returns the original byte from an escape sequence, or -1 on error
 	static int unstuffByte(uint8_t escaped) {
 		switch (escaped) {
 			case ESC_FRAME_START: return FRAME_START;
@@ -36,9 +36,9 @@ namespace protocol {
 
 	uint16_t encode(const Packet &pkt, uint8_t *output) {
 		uint16_t pos = 0;
-		if (pkt.payloadLen > MAX_PAYLOAD_SIZE) return 0; // Neplatný paket, nic neodesílat
+		if (pkt.payloadLen > MAX_PAYLOAD_SIZE) return 0; // Invalid packet, send nothing
 
-		// Sestavení neescapovaného obsahu pro CRC výpočet
+		// Build the unescaped content for the CRC computation
 		uint8_t length = HEADER_SIZE + pkt.payloadLen;
 		uint8_t raw[1 + HEADER_SIZE + MAX_PAYLOAD_SIZE]; // Length + header + payload
 		raw[0] = length;
@@ -52,15 +52,15 @@ namespace protocol {
 		uint8_t rawLen = static_cast<uint8_t>(1 + HEADER_SIZE + pkt.payloadLen);
 		uint8_t checksum = crc8(raw, rawLen);
 
-		// Zápis rámce
+		// Write the frame
 		output[pos++] = FRAME_START;
 
-		// Escapování Length .. Payload
+		// Escape Length .. Payload
 		for (uint8_t i = 0; i < rawLen; ++i) {
 			pos += stuffByte(raw[i], &output[pos]);
 		}
 
-		// Escapování checksum
+		// Escape the checksum
 		pos += stuffByte(checksum, &output[pos]);
 
 		output[pos++] = FRAME_END;
@@ -69,13 +69,13 @@ namespace protocol {
 	}
 
 	bool decodeFrame(const uint8_t *raw, uint16_t len, Packet &pkt) {
-		// Nejdříve un-stuff celý obsah
+		// First un-stuff the whole content
 		static constexpr uint16_t MAX_UNSTUFFED = 1 + HEADER_SIZE + MAX_PAYLOAD_SIZE + 1; // Length + header + payload + CRC
 		uint8_t unstuffed[MAX_UNSTUFFED];
 		uint16_t uLen = 0;
 
 		for (uint16_t i = 0; i < len; ++i) {
-			if (uLen >= MAX_UNSTUFFED) return false; // Příliš dlouhý rámec
+			if (uLen >= MAX_UNSTUFFED) return false; // Frame too long
 			if (raw[i] == ESC) {
 				if (i + 1 >= len) return false;
 				int val = unstuffByte(raw[++i]);
@@ -86,22 +86,22 @@ namespace protocol {
 			}
 		}
 
-		// Minimální délka: Length(1) + Header(4) + CRC(1) = 6
+		// Minimum length: Length(1) + Header(4) + CRC(1) = 6
 		if (uLen < 6) return false;
 
 		uint8_t length = unstuffed[0];
 
-		// Kontrola konzistence
+		// Consistency check
 		if (length < HEADER_SIZE) return false;
 		uint8_t payloadLen = static_cast<uint8_t>(length - HEADER_SIZE);
 		if (payloadLen > MAX_PAYLOAD_SIZE) return false;
 		if (uLen != 1u + length + 1u) return false; // Length byte + content + CRC
 
-		// CRC kontrola: přes Length .. Payload (vše kromě posledního bajtu = CRC)
+		// CRC check: over Length .. Payload (everything except the last byte = CRC)
 		uint8_t expectedCrc = crc8(unstuffed, uLen - 1);
 		if (expectedCrc != unstuffed[uLen - 1]) return false;
 
-		// Naplnění struktury
+		// Fill in the structure
 		pkt.source   = unstuffed[1];
 		pkt.dest     = unstuffed[2];
 		pkt.packetId = unstuffed[3];

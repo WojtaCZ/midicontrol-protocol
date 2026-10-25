@@ -6,13 +6,13 @@
 
 namespace protocol {
 
-	// Zakóduje paket do drátového formátu (s escapováním a rámcováním).
-	// Vrací počet zapsaných bajtů do output bufferu.
+	// Encodes a packet into the wire format (with escaping and framing).
+	// Returns the number of bytes written to the output buffer.
 	uint16_t encode(const Packet &pkt, uint8_t *output);
 
-	// Dekóduje surový rámec (bez FRAME_START/FRAME_END) zpět na paket.
-	// raw ukazuje na data mezi FRAME_START a FRAME_END (escapovaná).
-	// Vrací true při úspěšné validaci CRC.
+	// Decodes a raw frame (without FRAME_START/FRAME_END) back into a packet.
+	// raw points to the data between FRAME_START and FRAME_END (escaped).
+	// Returns true if the CRC validates.
 	bool decodeFrame(const uint8_t *raw, uint16_t len, Packet &pkt);
 
 } // namespace protocol
