@@ -168,10 +168,12 @@ font can draw them. The remote enables the add-verse key after the first anchor.
 
 | Type          | Code | Payload   |
 |---------------|------|-----------|
-| KEEPALIVE     | 0x60 | *(empty)* |
+| KEEPALIVE     | 0x60 | PC → Base: *(empty)*; Base → Remote: `[pcAlive]` (`0`/`1`) |
 | KEEPALIVE_ACK | 0x61 | *(empty)* |
 
 PC → Base and Base → Remote every 2 s; the receiver answers `KEEPALIVE_ACK`. Neither is ACKed.
+The base's `KEEPALIVE` to the remote carries whether the PC is alive (the same as `STATUS_RESP` `pcAlive`); the base also
+sends one at once when that changes. The remote treats an empty payload (older base) as `pcAlive = 1`.
 
 ---
 
