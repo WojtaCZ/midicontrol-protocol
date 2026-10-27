@@ -166,7 +166,7 @@ font can draw them. The remote enables the add-verse key after the first anchor.
 
 `INFO_RESP` carries firmware and device details for the PC's status page (tags in `inc/protocol/info.hpp`):
 revision, branch, build time, dirty flag, uptime, reset cause, fault count, Bluetooth state flags, peer address,
-device name, pairing state, and node-specific fields (base: display, SSR; remote: battery voltage and level,
+device name, pairing state, and node-specific fields (base: display, SSR; remote: battery voltage, percent and icon level,
 charger state, USB voltage). Values are little-endian. Every field is optional and a receiver skips unknown tags,
 so new fields need no new message type. A node without `GET_INFO` (older firmware) answers `NAK UNKNOWN_MSG`.
 

@@ -35,9 +35,10 @@ namespace protocol::info {
 
 		// Remote
 		BATTERY_MV    = 0x30, // u16: battery voltage, mV (0 = not measured yet)
-		BATTERY_LEVEL = 0x31, // u8: 0 = empty .. 4 = full
+		BATTERY_LEVEL = 0x31, // u8: battery icon step 0 = empty .. 4 = full (for display use BATTERY_PERCENT)
 		CHARGER       = 0x32, // u8: see ChargerFlag
 		VBUS_MV       = 0x33, // u16: USB 5 V rail, mV
+		BATTERY_PERCENT = 0x34, // u8: state of charge 0..100 % (from the filtered voltage)
 	};
 
 	enum BleFlag : uint8_t {
