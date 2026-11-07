@@ -28,6 +28,12 @@ namespace protocol::info {
 		BLE_PEER      = 0x11, // ASCII 12 hex digits: base = stored remote address, remote = address of the connected base
 		BLE_NAME      = 0x12, // ASCII own device name
 		BLE_PAIRING   = 0x13, // u8: base pairing state (0 idle, 1 scanning, 2 connecting, 3 bonding, 4 done, 5 failed)
+		LINK_RSSI     = 0x14, // i8: RSSI in dBm this node measured on the link (module command M); -128 = unknown / not connected
+		LINK_PARAMS   = 0x15, // u16 interval (1.25 ms), u16 latency, u16 supervision timeout (10 ms) of the live connection; 0 = unknown
+		LINK_PHY      = 0x16, // u8 tx PHY, u8 rx PHY (1 = 1M, 2 = 2M, 3 = Coded); 0 = unknown
+		LINK_COUNTERS = 0x17, // 5 x u16 since boot (saturating): link losses (%DISCONNECT% + %ERR_CONN% while connected), %ERR_CONN% events,
+		                      // module reboots (%REBOOT%), secure retries (B/K,1 watchdog), last reconnect time (ms from loss to %STREAM_OPEN%)
+		LINK_PEER_RSSI = 0x18, // i8: RSSI in dBm the other end measured (remote: from the base KEEPALIVE; base: from the remote's KEEPALIVE_ACK); -128 = unknown
 
 		// Base
 		DISPLAY       = 0x20, // u8: church display connected

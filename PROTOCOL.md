@@ -177,7 +177,7 @@ so new fields need no new message type. A node without `GET_INFO` (older firmwar
 | Type          | Code | Payload   |
 |---------------|------|-----------|
 | KEEPALIVE     | 0x60 | PC → Base: *(empty)*; Base → Remote: `[pcAlive]` (`0`/`1`) |
-| KEEPALIVE_ACK | 0x61 | *(empty)* |
+| KEEPALIVE_ACK | 0x61 | Remote → Base: `[rssi i8]` (the remote's own RSSI in dBm, optional, `0x80` = unknown); otherwise *(empty)* |
 
 PC → Base and Base → Remote every 2 s; the receiver answers `KEEPALIVE_ACK`. Neither is ACKed.
 The base's `KEEPALIVE` to the remote carries whether the PC is alive (the same as `STATUS_RESP` `pcAlive`); the base also
