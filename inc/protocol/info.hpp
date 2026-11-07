@@ -28,12 +28,14 @@ namespace protocol::info {
 		BLE_PEER      = 0x11, // ASCII 12 hex digits: base = stored remote address, remote = address of the connected base
 		BLE_NAME      = 0x12, // ASCII own device name
 		BLE_PAIRING   = 0x13, // u8: base pairing state (0 idle, 1 scanning, 2 connecting, 3 bonding, 4 done, 5 failed)
-		LINK_RSSI     = 0x14, // i8: RSSI in dBm this node measured on the link (module command M); -128 = unknown / not connected
-		LINK_PARAMS   = 0x15, // u16 interval (1.25 ms), u16 latency, u16 supervision timeout (10 ms) of the live connection; 0 = unknown
-		LINK_PHY      = 0x16, // u8 tx PHY, u8 rx PHY (1 = 1M, 2 = 2M, 3 = Coded); 0 = unknown
-		LINK_COUNTERS = 0x17, // 5 x u16 since boot (saturating): link losses (%DISCONNECT% + %ERR_CONN% while connected), %ERR_CONN% events,
-		                      // module reboots (%REBOOT%), secure retries (B/K,1 watchdog), last reconnect time (ms from loss to %STREAM_OPEN%)
-		LINK_PEER_RSSI = 0x18, // i8: RSSI in dBm the other end measured (remote: from the base KEEPALIVE; base: from the remote's KEEPALIVE_ACK); -128 = unknown
+		// Link quality (written LAST in INFO_RESP: the payload is limited to MAX_PAYLOAD_SIZE and the remote's is nearly full)
+		LINK_RSSI     = 0x14, // i8 own, i8 other end (dBm; -128 = unknown / not connected): what this node measured (module command M) and
+		                      // what the peer reported (remote: base RSSI from KEEPALIVE byte 1; base: remote RSSI from KEEPALIVE_ACK byte 0)
+		LINK_PARAMS   = 0x15, // u16 interval (1.25 ms), u16 supervision timeout (10 ms), u8 latency, u8 PHY = tx << 4 | rx (1 = 1M, 2 = 2M, 3 = Coded);
+		                      // 0 = unknown (no %CONN_PARAM% / %PHY_UPDATED% on this link yet)
+		LINK_COUNTERS = 0x17, // since boot, saturating: u8 link losses (%DISCONNECT% / %ERR_CONN% while connected), u8 %ERR_CONN% events,
+		                      // u8 module reboots (%REBOOT% not caused by us), u8 secure retries (B / K,1 watchdog), u16 last reconnect time (ms from loss to
+		                      // %STREAM_OPEN%, saturating)
 
 		// Base
 		DISPLAY       = 0x20, // u8: church display connected
