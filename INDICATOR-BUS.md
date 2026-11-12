@@ -88,7 +88,7 @@ Song 12, verse 5, letter blank, LED off, **exactly as printed in V2**:
 | Transmit | One 9-byte frame per change (about 75 ms on the wire). RX DMA is switched off while transmitting, so the base does not read its own echo. A frame in flight is never aborted |
 | Receive | Every complete 9-byte frame (RX timeout 100 bit times; incomplete frames are dropped) replaces the base's state. It is echoed to the PC as display SysEx. **The flag byte `0xB0` is not checked** (gap: D26 requires frames without `0xB0` to be dropped, SYS-BUS-08) |
 | Blank | The base writes `0xE0` for a blank field and `0xE0` for LED off |
-| Song range | `setSong()` caps at 1999 (gap: D23 allows any thousands digit, songs up to 9999) |
+| Song range | Songs go up to 1999 only (owner decision D23); `setSong()` caps there |
 | Collisions | None today; the base transmits whenever it has a change (gap: D25 requires waiting for a short quiet bus first, SYS-BUS-05) |
 
 ### Mapping: NOW_PLAYING_INFO / display SysEx ↔ bus frame
