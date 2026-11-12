@@ -12,4 +12,10 @@ disagree, the spec says what is wanted: ask the owner instead of changing the sp
 `docs/HARDWARE-base.md` / `docs/HARDWARE-remote.md` (or `docs/HARDWARE.md` in the matching firmware repo) describe the
 base (STM32G431) and remote (STM32G071) hardware. The firmware pin maps are authoritative; the KiCad repos are historical.
 
-The files in `docs/` here are generated copies. Do not edit them here.
+## Indicator bus
+
+`INDICATOR-BUS.md` is the main reference for the church indicator bus (physical layer, 9-byte frame, mapping to
+NOW_PLAYING_INFO and the display SysEx). It translates the owner's original V2 document, kept unchanged in
+`docs/indicator-bus/` (`.odt` + images). Edit `INDICATOR-BUS.md` here; never edit the `.odt`.
+
+The other files in `docs/` (SYSTEM.md, HARDWARE-*.md) are generated copies. Do not edit them here.
