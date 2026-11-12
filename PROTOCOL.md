@@ -160,7 +160,7 @@ font can draw them. The remote enables the add-verse key after the first anchor.
 | Type        | Code | Payload |
 |-------------|------|---------|
 | GET_STATUS  | 0x50 | *(empty)* |
-| STATUS_RESP | 0x51 | `[bleConnected, ssrOn, displayConnected, pcAlive]`, one byte each, `0`/`1` |
+| STATUS_RESP | 0x51 | `[bleConnected, ssrOn, displayConnected, pcAlive]`, one byte each, `0`/`1`; `bleConnected` is 1 only for a secured link (connected, stream open, peer accepted; SYS-LINK-07) |
 | GET_INFO    | 0x52 | *(empty)* — PC → Base or Remote, ACKed |
 | INFO_RESP   | 0x53 | TLV fields `[tag, len, value[len]]...` — node → PC, sent in addition to the ACK like `STATUS_RESP` |
 
