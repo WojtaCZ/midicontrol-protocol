@@ -76,10 +76,8 @@ Song 12, verse 5, letter blank, LED off, **exactly as printed in V2**:
 |---|---|---|---|---|---|---|---|---|
 | `0xB0` | `0x05` | `0xEX` | `0xEX` | `0xEX` | `0x01` | `0x02` | `0xEX` | `0xEX` |
 
-> **OPEN (owner, O-2).** This second example contradicts the "ones first" rule. Read by the rule, the song bytes put
-> 1 in the hundreds position and 2 in the thousands position, which shows "21  ", not "  12". Either the example is a
-> typo, or real indicators/controllers write short numbers left-aligned, which matches the shifted digits in the
-> 512/513 song files. The firmware follows the rule and shows each digit at the position it was given.
+> **Typo (owner decision D24).** This second example contradicts the "ones first" rule: read by the rule, it shows
+> "21  ", not "  12". The rule in the text is binding. Song 12 is `B0 05 E0 02 01 E0 E0 E0 E0`.
 
 ## 3. How MIDIcontrol uses the bus (from code, base `midicontrol-fw` `src/display.cpp`)
 
@@ -88,10 +86,10 @@ Song 12, verse 5, letter blank, LED off, **exactly as printed in V2**:
 | UART | USART1 PA9 TX / PA10 RX, 1200 Bd, 8N1, no inversion in the MCU (the opto circuit inverts) |
 | Presence | PC13 low = indicator connected (EXTI both edges). Nothing is sent while it is absent. On connect the current state is sent |
 | Transmit | One 9-byte frame per change (about 75 ms on the wire). RX DMA is switched off while transmitting, so the base does not read its own echo. A frame in flight is never aborted |
-| Receive | Every complete 9-byte frame (RX timeout 100 bit times; incomplete frames are dropped) replaces the base's state. It is echoed to the PC as display SysEx. **The flag byte `0xB0` is not checked** (gap, SYS-BUS-08) |
+| Receive | Every complete 9-byte frame (RX timeout 100 bit times; incomplete frames are dropped) replaces the base's state. It is echoed to the PC as display SysEx. **The flag byte `0xB0` is not checked** (gap: D26 requires frames without `0xB0` to be dropped, SYS-BUS-08) |
 | Blank | The base writes `0xE0` for a blank field and `0xE0` for LED off |
-| Song range | `setSong()` caps at 1999. The thousands digit is probably only "1" on the physical indicator (OPEN, O-1) |
-| Collisions | None. The base transmits whenever it has a change and the bus is present (O-10) |
+| Song range | `setSong()` caps at 1999 (gap: D23 allows any thousands digit, songs up to 9999) |
+| Collisions | None today; the base transmits whenever it has a change (gap: D25 requires waiting for a short quiet bus first, SYS-BUS-05) |
 
 ### Mapping: NOW_PLAYING_INFO / display SysEx ↔ bus frame
 
