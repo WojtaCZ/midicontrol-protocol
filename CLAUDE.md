@@ -12,6 +12,8 @@ disagree, the spec says what is wanted: ask the owner instead of changing the sp
 `docs/HARDWARE-base.md` / `docs/HARDWARE-remote.md` (or `docs/HARDWARE.md` in the matching firmware repo) describe the
 base (STM32G431) and remote (STM32G071) hardware. The firmware pin maps are authoritative; the KiCad repos are historical.
 
+- **User-visible changes** (screen text, menus, keys, timeouts, web page, CLI output, config keys, install steps): in the same commit series update midicontrolpy-sw/docs/SYSTEM.md (status/glossary/timing; then run midicontrolpy-sw/tools/sync-system-doc.sh), this CLAUDE.md/README, midicontrolpy-sw/docs/status-web-and-service.md for the PC, the screen scenarios in tools/screens/main.cpp, and the Czech user manual.
+
 ## Indicator bus
 
 `INDICATOR-BUS.md` is the main reference for the church indicator bus (physical layer, 9-byte frame, mapping to

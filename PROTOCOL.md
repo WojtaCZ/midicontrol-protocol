@@ -29,7 +29,7 @@ Bytes `0x01` (SOH), `0x04` (EOT), `0x1B` (ESC), `0x24` ($), `0x25` (%) inside th
 | 3      | PacketId | 1 B      | one 8-bit counter per node, shared by all messages it sends |
 | 4      | MsgType  | 1 B      | |
 | 5..    | Payload  | 0–128 B  | |
-| last   | CRC-8    | 1 B      | CRC-8/MAXIM (poly 0x31, init 0x00) over Length..Payload |
+| last   | CRC-8    | 1 B      | CRC-8 over Length..Payload: poly `0x31`, init `0x00`, MSB first (no reflection), no final XOR; check value `0xA2` for ASCII `123456789`. **Not** CRC-8/MAXIM (that is the reflected form, check `0xA1`); no reveng catalogue name matches exactly. Example: `07 01 02 0A 10 61 62 00` has CRC `0x59` |
 
 Escaping applies to Length through CRC. Worst case on the wire is `2 + 134 * 2 = 270` bytes
 (`MAX_FRAME_SIZE`). Receivers must bounds-check the unescaped length; frames that do not fit are dropped.
@@ -54,7 +54,7 @@ Escaping applies to Length through CRC. Worst case on the wire is `2 + 134 * 2 =
 - The **PC sends playback signals to the remote** (`SIGNAL_*`). The base may observe signals it forwards to
   keep its own OLED in step, but it does not consume them.
 - If the base cannot forward (BLE link down, PC not enumerated) it answers the sender with
-  `NAK UNREACHABLE` so the sender stops retrying.
+  `NAK UNREACHABLE` so the sender stops retrying. If the link is usable (BLE connected, stream open, peer accepted; or the PC enumerated) but the TX path is briefly occupied (e.g. the BLE module is in command mode), it answers `NAK BUSY` instead and the sender retries.
 
 ## Reliability
 
@@ -63,7 +63,7 @@ Escaping applies to Length through CRC. Worst case on the wire is `2 + 134 * 2 =
   `NOW_PLAYING_INFO` and broadcasts. A response message (e.g. `SONG_LIST_RESP`, `STATUS_RESP`) is sent
   in addition to the ACK of the request.
 - The sender retransmits the **same PacketId** after `RETRY_TIMEOUT_MS` (500 ms), at most `MAX_RETRIES` (3)
-  times. A receiver that sees the same `(Source, PacketId)` as the previous frame ACKs it again but does not
+  times. A receiver that sees the same `(Source, PacketId)` as the previous frame from that source (receivers may remember more) ACKs it again but does not
   execute it twice.
 - Unknown `MsgType` is answered with `NAK UNKNOWN_MSG`, a bad payload with `NAK INVALID_PAYLOAD`.
 - `KEEPALIVE` is sent every 2 s by the PC to the base and by the base to the remote; the peer answers
@@ -80,7 +80,7 @@ Escaping applies to Length through CRC. Worst case on the wire is `2 + 134 * 2 =
 | ACK  | 0x01 | any → any     | `[ackedPacketId]`                           |
 | NAK  | 0x02 | any → any     | `[ackedPacketId, nakReason]`                |
 
-NAK reasons: `0x01` unknown msg, `0x02` invalid payload, `0x03` CRC error, `0x04` busy, `0x05` not playing, `0x06` unreachable (base could not forward), `0x07` not found (unknown song code).
+NAK reasons: `0x01` unknown msg, `0x02` invalid payload, `0x03` CRC error, `0x04` busy (receiver or the base's TX path momentarily occupied, retry later; sent by the base when forwarding while the link is up), `0x05` not playing, `0x06` unreachable (base could not forward), `0x07` not found (unknown song code).
 
 ---
 
@@ -164,7 +164,7 @@ font can draw them. The remote enables the add-verse key after the first anchor.
 | GET_INFO    | 0x52 | *(empty)* — PC → Base or Remote, ACKed |
 | INFO_RESP   | 0x53 | TLV fields `[tag, len, value[len]]...` — node → PC, sent in addition to the ACK like `STATUS_RESP` |
 
-`INFO_RESP` carries firmware and device details for the PC's status page (tags in `inc/protocol/info.hpp`):
+`INFO_RESP` carries firmware and device details for the PC's status page (authoritative tag list: `inc/protocol/info.hpp`; it also has the link-quality tags `0x14` LINK_RSSI, `0x15` LINK_PARAMS, `0x17` LINK_COUNTERS):
 revision, branch, build time, dirty flag, uptime, reset cause, fault count, Bluetooth state flags, peer address,
 device name, pairing state, and node-specific fields (base: display, SSR; remote: battery voltage, percent and icon level,
 charger state, USB voltage). Values are little-endian. Every field is optional and a receiver skips unknown tags,
@@ -176,12 +176,12 @@ so new fields need no new message type. A node without `GET_INFO` (older firmwar
 
 | Type          | Code | Payload   |
 |---------------|------|-----------|
-| KEEPALIVE     | 0x60 | PC → Base: *(empty)*; Base → Remote: `[pcAlive]` (`0`/`1`) |
+| KEEPALIVE     | 0x60 | PC → Base: *(empty)*; Base → Remote: `[pcAlive, rssi i8]` (`pcAlive` `0`/`1`; `rssi` = the base's own RSSI of the BLE link in dBm, `0x80` = unknown; an older remote reads byte 0 only) |
 | KEEPALIVE_ACK | 0x61 | Remote → Base: `[rssi i8]` (the remote's own RSSI in dBm, optional, `0x80` = unknown); otherwise *(empty)* |
 
 PC → Base and Base → Remote every 2 s; the receiver answers `KEEPALIVE_ACK`. Neither is ACKed.
 The base's `KEEPALIVE` to the remote carries whether the PC is alive (the same as `STATUS_RESP` `pcAlive`); the base also
-sends one at once when that changes. The remote treats an empty payload (older base) as `pcAlive = 1`.
+sends one at once when that changes. The remote treats an empty payload (older base) as `pcAlive = 1` and a missing second byte as RSSI unknown.
 
 ---
 
@@ -195,14 +195,25 @@ sends one at once when that changes. The remote treats an empty payload (older b
 | FW_UPDATE_STATUS | 0x73 | `[statusCode]` — device → PC progress/result         |
 | ENTER_BOOTLOADER | 0x74 | *(empty)* — base reboots into its USB-CDC bootloader |
 
-FW_UPDATE_STATUS codes: `0x00` ready, `0x01` in-progress, `0x02` CRC OK (applying), `0x03` CRC fail, `0x04` write error, `0x05` bad size.
+FW_UPDATE_STATUS codes: `0x00` ready, `0x01` in-progress (**reserved, no device sends it**; receivers filter it out), `0x02` CRC OK (applying), `0x03` CRC fail, `0x04` write error, `0x05` bad size.
+
+Receiver rules (`FwReceiver`, see the bootloader README "Firmware update protocol notes" and "Image format"):
+
+- Every `FW_UPDATE_*` frame gets `ACK` or `NAK`; `FW_UPDATE_STATUS` follows where the step has a result: `READY` after `START`;
+  `CRC_OK` / `CRC_FAIL` / `WRITE_ERROR` / `BAD_SIZE` after `END`; `WRITE_ERROR` / `BAD_SIZE` after a failed chunk.
+- `START`'s `target` byte must equal the receiving node, else `NAK` + `BAD_SIZE`. The image size must fit the application
+  region (base 94 KB = `0x17800`, remote 110 KB).
+- Chunks must arrive in order. A retransmitted chunk is ACKed again and not written twice; a gap or partial overlap is
+  `NAK INVALID_PAYLOAD`.
+- The file is the application `.bin`, padded with `0xFF` to a multiple of 8 and followed by a 24-byte trailer; a wrong
+  trailer ends in `BAD_SIZE` or `CRC_FAIL` at `END`.
 
 The base updates over **USB-CDC** with this custom protocol, not USB DFU: the app handles
 `ENTER_BOOTLOADER`, sets a magic word in a TAMP backup register and resets into the bootloader.
 `FW_UPDATE_DATA` chunks for the base must be a **multiple of 8 bytes** (flash double-word programming),
 except the last one, which the bootloader pads with `0xFF`. The remote stages the image in its external
-flash; `FW_UPDATE_START` may take several seconds there (sector erase), so the PC should wait up to 15 s
-for the first `FW_UPDATE_STATUS`.
+flash and erases the staging area (64 KB blocks, typically under 1 s, up to ~8 s worst case) **before** it sends the `ACK` of
+`FW_UPDATE_START`, so the PC should wait up to 15 s for that `ACK`; `STATUS READY` follows it.
 
 ---
 
@@ -249,6 +260,8 @@ overwritten are skipped; the node then inserts a `RECORDS_LOST` record with the 
 | 14   | OTA_RESULT        | FwStatus |
 | 15   | SHUTDOWN          | reason |
 | 16   | RECORDS_LOST      | number of records dropped |
+| 17   | BLE_MODULE_REBOOT | remote: the BLE module reported `%REBOOT%` on its own (brown-out or module reset, not caused by the remote's own reset); ms since the previous one, `0` = first |
+| 18   | BLE_ERR_CONN      | remote: `%ERR_CONN%` while connected = link lost (supervision timeout); last RSSI in dBm (i8 in the low byte, `0x80` = unknown) |
 
 **Polling rule (PC).** Send `DIAG_GET` when the node's link comes up and then every 10 s while it is alive; never
 during a firmware update; once a response carries `n = 0`, ask again only on the next timer tick. Use the previous

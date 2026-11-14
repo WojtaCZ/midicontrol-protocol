@@ -86,10 +86,10 @@ Song 12, verse 5, letter blank, LED off, **exactly as printed in V2**:
 | UART | USART1 PA9 TX / PA10 RX, 1200 Bd, 8N1, no inversion in the MCU (the opto circuit inverts) |
 | Presence | PC13 low = indicator connected (EXTI both edges). Nothing is sent while it is absent. On connect the current state is sent |
 | Transmit | One 9-byte frame per change (about 75 ms on the wire). RX DMA is switched off while transmitting, so the base does not read its own echo. A frame in flight is never aborted |
-| Receive | Every complete 9-byte frame (RX timeout 100 bit times; incomplete frames are dropped) replaces the base's state. It is echoed to the PC as display SysEx. **The flag byte `0xB0` is not checked** (gap: D26 requires frames without `0xB0` to be dropped, SYS-BUS-08) |
+| Receive | Every complete 9-byte frame (RX timeout 100 bit times; incomplete frames are dropped) replaces the base's state. It is echoed to the PC as display SysEx. Frames whose flag byte is not `0xB0` are dropped and counted (`indicator_bus.cpp` `frameAccepted`; D26, SYS-BUS-08; implemented, not verified on the bench) |
 | Blank | The base writes `0xE0` for a blank field and `0xE0` for LED off |
-| Song range | Songs go up to 1999 only (owner decision D23); `setSong()` caps there |
-| Collisions | None today; the base transmits whenever it has a change (gap: D25 requires waiting for a short quiet bus first, SYS-BUS-05) |
+| Song range | Songs go up to 1999 only (owner decision D23); spec limit. **Not enforced in the base**: the live path (`applyNowPlaying`) passes any thousands digit 0-9 and `setSong()` (which caps at 1999) has no caller; enforcement is a gap (SYSTEM.md gap, owner question) |
+| Collisions | None today. The base waits for a quiet bus (`QUIET_MS` = 25 ms, `indicator::QuietBus`, gating the start of a frame in `display.cpp`) before transmitting (D25, SYS-BUS-05; implemented, not verified on the bench) |
 
 ### Mapping: NOW_PLAYING_INFO / display SysEx ↔ bus frame
 
