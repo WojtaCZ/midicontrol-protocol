@@ -5,7 +5,7 @@ It is an English translation of the owner's original V2 document
 (`docs/indicator-bus/Komunikacni_protokol_svetelneho_ukazatele.odt`, 2020). The translation is followed by notes on
 how the MIDIcontrol code uses the bus. The owner's expected behaviour on the bus is in `docs/SYSTEM.md`
 (sec. 4.14 and sec. 5). The display SysEx (`F0 4D 43 ...`) that is embedded in song files and echoed to the PC is
-**not** this bus format: see `midicontrol-fw/readme.md` and the mapping table below.
+**not** this bus format: see `midicontrol-fw/docs/display-sysex.md` and the mapping table below.
 
 ## 1. Physical interface (translated from V2)
 

@@ -66,6 +66,18 @@ Escaping applies to Length through CRC. Worst case on the wire is `2 + 134 * 2 =
   times. A receiver that sees the same `(Source, PacketId)` as the previous frame from that source (receivers may remember more) ACKs it again but does not
   execute it twice.
 - Unknown `MsgType` is answered with `NAK UNKNOWN_MSG`, a bad payload with `NAK INVALID_PAYLOAD`.
+- `NAK BUSY` is not final *(implemented on branch audit/step2-review, pending owner decision Q-D-8)*: the
+  sender (base or remote) keeps the entry and resends with the **same PacketId**, inside the same
+  `MAX_RETRIES` budget. The base retries only frames it originated; a frame it forwarded is retried by its
+  originator.
+- Supersede *(implemented on audit/step2-review, pending owner decision Q-D-9, Q-D-6, Q-D-7)*: a sender may drop an
+  older un-ACKed frame when a newer one makes it meaningless; the dropped PacketId is simply never resent.
+  - A newer `SET_CURRENT` supersedes older pending `SET_CURRENT` to the same node.
+  - Signal group 2 = `SIGNAL_PLAYING`, `SIGNAL_RECORDING`, `SIGNAL_STOPPED`: a newer one supersedes older pending
+    ones of the group, and also a pending `SIGNAL_ANCHOR`.
+- Remote STOP displacement (RF-11) *(implemented on audit/step2-review, pending owner decision Q-RF-4)*: a
+  `STOP_SONG` from the remote always gets a send slot; when all slots are busy the remote drops its least
+  valuable pending request, which then ends as if answered `NAK BUSY` (no further resend).
 - `KEEPALIVE` is sent every 2 s by the PC to the base and by the base to the remote; the peer answers
   `KEEPALIVE_ACK`. A peer is considered lost after 6 s without an answer.
 
@@ -88,7 +100,7 @@ NAK reasons: `0x01` unknown msg, `0x02` invalid payload, `0x03` CRC error, `0x04
 
 | Type             | Code | Direction       | Payload |
 |------------------|------|-----------------|---------|
-| PLAY_SONG        | 0x10 | Remote/Base → PC | ASCII song code, 1–8 chars `[0-9A-Z]`, e.g. `"406A"`. No terminator required; a trailing `0x00` is tolerated |
+| PLAY_SONG        | 0x10 | Remote/Base → PC | ASCII song code, e.g. `"406A"` (rule below; the frame bound is `MAX_SONG_CODE_LEN` = 8 chars). No terminator required; a trailing `0x00` is tolerated |
 | STOP_SONG        | 0x11 | Remote/Base → PC | *(empty)* or `[mode]`: `0x00` stop, `0x01` pause (the PC may treat pause as stop) |
 | RECORD_SONG      | 0x12 | –               | *(reserved)* |
 | NOW_PLAYING_INFO | 0x13 | PC → Base       | see below |
@@ -96,6 +108,11 @@ NAK reasons: `0x01` unknown msg, `0x02` invalid payload, `0x03` CRC error, `0x04
 
 The song code is also the file name on the PC (`406A.mid`). A 16-bit number is not used because it cannot
 express letter variants (406A / 406B). The PC answers an unknown code with `NAK NOT_FOUND`.
+
+**Song code rule** (owner decision Q1-2 a, 2026-11-14): 1–4 digits, value at most 1999, plus an optional letter
+`A`–`D`. Every node checks it; the PC answers a `PLAY_SONG` that breaks the rule with `NAK INVALID_PAYLOAD`.
+`MAX_SONG_CODE_LEN` (8) stays the frame bound for the payload length, not the rule. Open: whether `"012"` and `"12"`
+are the same code (pending, Q-W2-8).
 
 **REPLAY_ANCHOR (add verse)** means "play one more verse": the current verse is played to its end, then
 played once more before playback continues. Each press adds one extra pass; presses accumulate.
@@ -182,6 +199,9 @@ so new fields need no new message type. A node without `GET_INFO` (older firmwar
 PC → Base and Base → Remote every 2 s; the receiver answers `KEEPALIVE_ACK`. Neither is ACKed.
 The base's `KEEPALIVE` to the remote carries whether the PC is alive (the same as `STATUS_RESP` `pcAlive`); the base also
 sends one at once when that changes. The remote treats an empty payload (older base) as `pcAlive = 1` and a missing second byte as RSSI unknown.
+`pcAlive = 0` means "PC gone". *(Implemented on audit/step2-review, pending owner decision Q-D-15:)* receiving it
+(a change from 1 to 0) is the remote's only trigger to reset its player state; a BLE drop or a keepalive that ages
+out does not reset it.
 
 ---
 
