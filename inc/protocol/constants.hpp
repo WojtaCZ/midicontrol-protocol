@@ -42,7 +42,8 @@ namespace protocol {
 	static constexpr uint16_t KEEPALIVE_PERIOD_MS = 2000;
 	static constexpr uint16_t KEEPALIVE_LOSS_MS   = 6000;
 
-	// Song code in PLAY_SONG / SIGNAL_PLAYING: ASCII [0-9A-Z], e.g. "406A"
+	// Song code in PLAY_SONG / SIGNAL_PLAYING: 1-4 ASCII digits, value at most 1999, plus an optional letter A-D,
+	// e.g. "406A" (rule in docs/SYSTEM.md SYS-USE-22, Q1-2 a). MAX_SONG_CODE_LEN is only the frame bound.
 	static constexpr uint8_t MAX_SONG_CODE_LEN = 8;
 
 	// NOW_PLAYING_INFO: field values
