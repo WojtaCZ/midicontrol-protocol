@@ -63,8 +63,9 @@ Escaping applies to Length through CRC. Worst case on the wire is `2 + 134 * 2 =
   `NOW_PLAYING_INFO` and broadcasts. A response message (e.g. `SONG_LIST_RESP`, `STATUS_RESP`) is sent
   in addition to the ACK of the request.
 - The sender retransmits the **same PacketId** after `RETRY_TIMEOUT_MS` (500 ms), at most `MAX_RETRIES` (3)
-  times. A receiver that sees the same `(Source, PacketId)` as the previous frame from that source (receivers may remember more) ACKs it again but does not
-  execute it twice.
+  times. A receiver remembers the last 8 PacketIds per source (a window); a frame whose `(Source, PacketId)` is anywhere in
+  that window is a retry: it is ACKed again but not executed twice. A new PC session is announced by the nonce in
+  `KEEPALIVE` (see below): the receiver then forgets the window of the PC.
 - Unknown `MsgType` is answered with `NAK UNKNOWN_MSG`, a bad payload with `NAK INVALID_PAYLOAD`.
 - `NAK BUSY` is not final *(implemented on branch audit/step2-review, pending owner decision Q-D-8)*: the
   sender (base or remote) keeps the entry and resends with the **same PacketId**, inside the same
@@ -80,6 +81,16 @@ Escaping applies to Length through CRC. Worst case on the wire is `2 + 134 * 2 =
   valuable pending request, which then ends as if answered `NAK BUSY` (no further resend).
 - `KEEPALIVE` is sent every 2 s by the PC to the base and by the base to the remote; the peer answers
   `KEEPALIVE_ACK`. A peer is considered lost after 6 s without an answer.
+
+---
+
+## Protocol version
+
+`PROTOCOL_VERSION` (`inc/protocol/constants.hpp`, currently **2**) is reported by each node in `INFO_RESP` as tag
+`PROTO_VER` (0x08, u8). A node that does not send the tag speaks v1 (the wire format before the version existed).
+The PC reads it from `GET_INFO` per peer and enables each new behaviour only when the peers involved report v2 (a feature
+between two peers is active only when both ends are v2; the base relays). Base v2 + remote v1 and the reverse are valid.
+All v2 items are additive: nothing changes meaning, nothing is removed. v2 so far: session nonce in `KEEPALIVE`, duplicate window.
 
 ---
 
@@ -193,10 +204,15 @@ so new fields need no new message type. A node without `GET_INFO` (older firmwar
 
 | Type          | Code | Payload   |
 |---------------|------|-----------|
-| KEEPALIVE     | 0x60 | PC → Base: *(empty)*; Base → Remote: `[pcAlive, rssi i8]` (`pcAlive` `0`/`1`; `rssi` = the base's own RSSI of the BLE link in dBm, `0x80` = unknown; an older remote reads byte 0 only) |
+| KEEPALIVE     | 0x60 | PC → Base: `[nonce u16 LE]` (v2; *empty* from a v1 PC); Base → Remote: `[pcAlive, rssi i8, nonce u16 LE]` (`pcAlive` `0`/`1`; `rssi` = the base's own RSSI of the BLE link in dBm, `0x80` = unknown; `nonce` = the PC's current nonce, 0 = none; an older remote reads byte 0 only) |
 | KEEPALIVE_ACK | 0x61 | Remote → Base: `[rssi i8]` (the remote's own RSSI in dBm, optional, `0x80` = unknown); otherwise *(empty)* |
 
 PC → Base and Base → Remote every 2 s; the receiver answers `KEEPALIVE_ACK`. Neither is ACKed.
+The **session nonce** is a 16-bit number the PC picks at process start (random, `0` is reserved for "no nonce") and keeps
+until it exits; the PC sends a `KEEPALIVE` with it before any reliable frame after the port opens. A receiver that sees a non-zero
+nonce different from the stored one (the first one counts) forgets the duplicate window of the PC, so a restarted PC whose first
+PacketId repeats an old one is not swallowed as a duplicate. The base also forgets the stored nonce when it declares the PC lost.
+A zero or missing nonce (v1 PC) never resets anything.
 The base's `KEEPALIVE` to the remote carries whether the PC is alive (the same as `STATUS_RESP` `pcAlive`); the base also
 sends one at once when that changes. The remote treats an empty payload (older base) as `pcAlive = 1` and a missing second byte as RSSI unknown.
 `pcAlive = 0` means "PC gone". *(Implemented on audit/step2-review, pending owner decision Q-D-15:)* receiving it

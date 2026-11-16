@@ -5,6 +5,10 @@
 
 namespace protocol {
 
+	// Wire protocol version, reported by each node in INFO_RESP (info::Tag::PROTO_VER). v1 = no version field (implicit),
+	// v2 = session nonce in KEEPALIVE and the other additions listed in PROTOCOL.md "Protocol version".
+	static constexpr uint8_t PROTOCOL_VERSION = 2;
+
 	// Frame delimiters (unescaped)
 	static constexpr uint8_t FRAME_START = 0x01; // SOH
 	static constexpr uint8_t FRAME_END   = 0x04; // EOT
