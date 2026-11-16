@@ -90,7 +90,7 @@ Escaping applies to Length through CRC. Worst case on the wire is `2 + 134 * 2 =
 `PROTO_VER` (0x08, u8). A node that does not send the tag speaks v1 (the wire format before the version existed).
 The PC reads it from `GET_INFO` per peer and enables each new behaviour only when the peers involved report v2 (a feature
 between two peers is active only when both ends are v2; the base relays). Base v2 + remote v1 and the reverse are valid.
-All v2 items are additive: nothing changes meaning, nothing is removed. v2 so far: session nonce in `KEEPALIVE`, duplicate window.
+All v2 items are additive: nothing changes meaning, nothing is removed. v2 so far: session nonce in `KEEPALIVE`, duplicate window, `ORGAN_SRC` INFO tag.
 
 ---
 
@@ -194,9 +194,11 @@ font can draw them. The remote enables the add-verse key after the first anchor.
 
 `INFO_RESP` carries firmware and device details for the PC's status page (authoritative tag list: `inc/protocol/info.hpp`; it also has the link-quality tags `0x14` LINK_RSSI, `0x15` LINK_PARAMS, `0x17` LINK_COUNTERS):
 revision, branch, build time, dirty flag, uptime, reset cause, fault count, Bluetooth state flags, peer address,
-device name, pairing state, and node-specific fields (base: display, SSR; remote: battery voltage, percent and icon level,
+device name, pairing state, and node-specific fields (base: display, SSR, ORGAN_SRC; remote: battery voltage, percent and icon level,
 charger state, USB voltage). Values are little-endian. Every field is optional and a receiver skips unknown tags,
 so new fields need no new message type. A node without `GET_INFO` (older firmware) answers `NAK UNKNOWN_MSG`.
+
+Base tag `ORGAN_SRC` (0x22, u8, v2) says who switched the organ power on: `0` off, `1` on by the PC (`SET_CURRENT` from the PC), `2` on by the base menu, `3` on with unknown source (reserved: the SSR is always off after a base reset). It lets a restarted PC tell its own power-on from a manual one. The last switch-on wins (an explicit `SET_CURRENT 1` from the PC while the menu had it on makes the PC the owner); switching off clears it. A v1 base does not send the tag (the PC then treats a power-on as manual).
 
 ---
 

@@ -41,6 +41,7 @@ namespace protocol::info {
 		// Base
 		DISPLAY       = 0x20, // u8: church display connected
 		SSR           = 0x21, // u8: organ power (SSR) on
+		ORGAN_SRC     = 0x22, // u8: who switched the organ power on: 0 off, 1 on by the PC (SET_CURRENT from ADDR_PC), 2 on by the base menu, 3 on, source unknown (reserved: the SSR is always off after a base reset). Absent on a v1 base
 
 		// Remote
 		BATTERY_MV    = 0x30, // u16: battery voltage, mV (0 = not measured yet)
