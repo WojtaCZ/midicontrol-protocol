@@ -54,6 +54,9 @@ namespace protocol {
 	static constexpr uint8_t NPI_NO_CHANGE = 0xFF; // field unchanged
 	static constexpr uint8_t NPI_BLANK     = 0xFE; // blank the field (song number / verse)
 	static constexpr uint8_t NPI_DIGIT_BLANK = 0x0F; // BCD nibble: blank digit
+	// NOW_PLAYING_INFO with exactly this one byte: clear the indicator only if the number on the bus is still the one
+	// this system wrote (protocol v2, A3). The empty payload stays the unconditional clear.
+	static constexpr uint8_t NPI_CLEAR_IF_OWN = 0x01;
 
 } // namespace protocol
 

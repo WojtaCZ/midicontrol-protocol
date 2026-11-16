@@ -145,6 +145,13 @@ The PC answers `NAK NOT_PLAYING` when nothing is playing.
   are `0xFF`, so a short number such as `"  12"` (`0xFF 0x12`) is still expressible.
 - `0xFE` in `song_h` (with any `song_l`) or in `verse` **blanks** that field (e.g. verse blank during the prelude).
 - An **empty payload clears** the whole indicator (all digits blank, no letter, LED off).
+- A **1-byte payload `[0x01]`** (`NPI_CLEAR_IF_OWN`, protocol v2) clears the indicator **only if this system wrote the
+  number last**. The base tracks the writer: its own writes (NOW_PLAYING_INFO, menu) mark the bus "ours", any accepted
+  frame received from the bus marks it "foreign" (another master, e.g. a manual controller, wrote after us). On a
+  foreign number the base keeps it and does nothing; the message is not ACKed in either case. The PC sends this form
+  when a song stops or ends and only to a base that reports `PROTO_VER >= 2`; to a v1 base it sends the empty payload,
+  because a v1 base ignores every payload shorter than 5 bytes and would never clear. Any other length below 5 is
+  ignored. The base's own conditional rule also applies when it clears the indicator after a PC loss.
 
 ---
 

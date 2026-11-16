@@ -106,3 +106,13 @@ Song 12, verse 5, letter blank, LED off, **exactly as printed in V2**:
 
 The colour numbers differ between the SysEx and the bus (SysEx 2 = green, bus `0x21` = yellow). Always convert through
 the table, never by arithmetic.
+
+### Who wrote the number on the bus (writer tracking, protocol v2)
+
+The bus is multi-master, so the base keeps one piece of state: the last writer of the number, `None`, `Own` or
+`Foreign`. Its own frames (NOW_PLAYING_INFO, menu) set `Own`; every accepted frame received from the bus sets
+`Foreign`. The base does not hear its own transmission (the receiver is off while a frame goes out and is restarted
+after the last stop bit), so every accepted frame is another master's; a frame identical to the base's current state
+is not counted as foreign. NOW_PLAYING_INFO `[0x01]` (`NPI_CLEAR_IF_OWN`) clears the bus only while the writer is `Own`
+(then the writer becomes `None`); on `Foreign` the number stays and the writer stays `Foreign`. The empty
+NOW_PLAYING_INFO is the unconditional clear. The periodic 500 ms resend of the state is not a write.
