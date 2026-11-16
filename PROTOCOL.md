@@ -188,7 +188,7 @@ font can draw them. The remote enables the add-verse key after the first anchor.
 | Type        | Code | Payload |
 |-------------|------|---------|
 | GET_STATUS  | 0x50 | *(empty)* |
-| STATUS_RESP | 0x51 | `[bleConnected, ssrOn, displayConnected, pcAlive]`, one byte each, `0`/`1`; `bleConnected` is 1 only for a secured link (connected, stream open, peer accepted; SYS-LINK-07) |
+| STATUS_RESP | 0x51 | `[bleConnected, ssrOn, displayConnected, pcAlive, flags, remote_boot_id u16 LE]` (7 B, v2; a v1 base sends the first 4 B only), one byte each `0`/`1` for the first four; `bleConnected` is 1 only for a secured link (connected, stream open, peer accepted; SYS-LINK-07). `flags` bit0 = the remote's boot id is valid (the base has seen a v2 remote's `KEEPALIVE_ACK` since the link came up; `remote_boot_id` is 0 otherwise), bits 1-7 reserved 0 |
 | GET_INFO    | 0x52 | *(empty)* — PC → Base or Remote, ACKed |
 | INFO_RESP   | 0x53 | TLV fields `[tag, len, value[len]]...` — node → PC, sent in addition to the ACK like `STATUS_RESP` |
 
@@ -205,9 +205,14 @@ so new fields need no new message type. A node without `GET_INFO` (older firmwar
 | Type          | Code | Payload   |
 |---------------|------|-----------|
 | KEEPALIVE     | 0x60 | PC → Base: `[nonce u16 LE]` (v2; *empty* from a v1 PC); Base → Remote: `[pcAlive, rssi i8, nonce u16 LE]` (`pcAlive` `0`/`1`; `rssi` = the base's own RSSI of the BLE link in dBm, `0x80` = unknown; `nonce` = the PC's current nonce, 0 = none; an older remote reads byte 0 only) |
-| KEEPALIVE_ACK | 0x61 | Remote → Base: `[rssi i8]` (the remote's own RSSI in dBm, optional, `0x80` = unknown); otherwise *(empty)* |
+| KEEPALIVE_ACK | 0x61 | Remote → Base: `[rssi i8, boot_id u16 LE]` (v2; the remote's own RSSI in dBm, `0x80` = unknown; `boot_id` = the remote's boot id, the same value as `DIAG_RESP`). A v1 remote sends `[rssi]` only, an older one *(empty)*; a receiver reads the bytes that are present. Base → PC / PC → Base: *(empty)* |
 
 PC → Base and Base → Remote every 2 s; the receiver answers `KEEPALIVE_ACK`. Neither is ACKed.
+The base keeps the remote's last `boot_id` and reports it in `STATUS_RESP` (flags bit0 = valid); it forgets it when the remote is declared lost.
+The PC compares it with the previous value while `bleConnected = 1`: a change (not the first value) means the remote rebooted, even if
+the reboot was shorter than the 5 s `STATUS` poll and no `bleConnected` 0 → 1 edge was seen, and the PC resyncs the remote (playing state,
+anchor, flags) once. The same `boot_id` after a pure BLE drop means the remote kept its state: no resync. A power loss redraws the
+epoch, so two boots collide with probability 1/65536.
 The **session nonce** is a 16-bit number the PC picks at process start (random, `0` is reserved for "no nonce") and keeps
 until it exits; the PC sends a `KEEPALIVE` with it before any reliable frame after the port opens. A receiver that sees a non-zero
 nonce different from the stored one (the first one counts) forgets the duplicate window of the PC, so a restarted PC whose first
