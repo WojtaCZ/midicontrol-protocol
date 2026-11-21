@@ -76,6 +76,7 @@ Escaping applies to Length through CRC. Worst case on the wire is `2 + 134 * 2 =
   - A newer `SET_CURRENT` supersedes older pending `SET_CURRENT` to the same node.
   - Signal group 2 = `SIGNAL_PLAYING`, `SIGNAL_RECORDING`, `SIGNAL_STOPPED`: a newer one supersedes older pending
     ones of the group, and also a pending `SIGNAL_ANCHOR`.
+  - Signal group 3 = `SIGNAL_INFO` (v2): a newer one supersedes older pending ones of the group only.
 - Remote STOP displacement (RF-11) *(implemented on audit/step2-review, pending owner decision Q-RF-4)*: a
   `STOP_SONG` from the remote always gets a send slot; when all slots are busy the remote drops its least
   valuable pending request, which then ends as if answered `NAK BUSY` (no further resend).
@@ -90,7 +91,7 @@ Escaping applies to Length through CRC. Worst case on the wire is `2 + 134 * 2 =
 `PROTO_VER` (0x08, u8). A node that does not send the tag speaks v1 (the wire format before the version existed).
 The PC reads it from `GET_INFO` per peer and enables each new behaviour only when the peers involved report v2 (a feature
 between two peers is active only when both ends are v2; the base relays). Base v2 + remote v1 and the reverse are valid.
-All v2 items are additive: nothing changes meaning, nothing is removed. v2 so far: session nonce in `KEEPALIVE`, duplicate window, `ORGAN_SRC` INFO tag.
+All v2 items are additive: nothing changes meaning, nothing is removed. v2 so far: session nonce in `KEEPALIVE`, duplicate window, `ORGAN_SRC` INFO tag, `SIGNAL_INFO` (0x34).
 
 ---
 
@@ -181,10 +182,30 @@ The PC fills a page up to the payload limit. Paging rules:
 | SIGNAL_RECORDING | 0x31 | *(reserved)* |
 | SIGNAL_STOPPED   | 0x32 | *(empty)* — playback ended or was stopped |
 | SIGNAL_ANCHOR    | 0x33 | null-terminated ASCII label, max 127 bytes + `\0` |
+| SIGNAL_INFO      | 0x34 | `[flags u8]` *(protocol v2)* — state flags of the current song/system, see below |
 
 **SIGNAL_ANCHOR** is sent every time playback enters a new section, e.g. `"Predehra"` (prelude),
 `"Sloka 2"`, or `"Sloka 2 +1"` while add-verse repeats are pending. Labels are ASCII so a small OLED
 font can draw them. The remote enables the add-verse key after the first anchor.
+
+**SIGNAL_INFO** *(protocol v2, PC or base → remote)* carries a flags byte; a receiver reads the bytes and bits it
+knows and ignores the rest (longer payloads and new bits may be added later), reserved bits are sent as 0. It is an
+ACKed state message; the sender always sends the complete flags byte, and the newest one supersedes older pending
+`SIGNAL_INFO` (supersede group 3, independent of the group-2 playback signals: a `SIGNAL_PLAYING` neither drops nor is
+dropped by it). A payload shorter than 1 byte is answered `NAK INVALID_PAYLOAD`. The base forwards it by destination
+like any other type; a v1 remote answers `NAK UNKNOWN_MSG`, so the PC sends it only to a remote that reports
+`PROTO_VER >= 2`.
+
+| Bit | Name | Meaning |
+|-----|------|---------|
+| 0 | `SONG_HAS_SECTIONS` | the song that plays has verse markers (sections). 0 = it has none: the remote hides add-verse and does not send `REPLAY_ANCHOR` |
+| 1 | `BASE_UPDATING` | *(reserved for A8, not sent yet)* the base is updating its firmware |
+| 2-7 | | reserved, 0 |
+
+Sequence: the PC sends `SIGNAL_INFO` right after `SIGNAL_PLAYING` of a song and before its first `SIGNAL_ANCHOR`, and
+repeats it after the `SIGNAL_PLAYING` of a resync. The remote resets `SONG_HAS_SECTIONS` to "has sections" on
+`SIGNAL_PLAYING` and on `SIGNAL_STOPPED`; a remote that never receives the message (v1 PC) keeps today's behaviour,
+add-verse visible.
 
 ---
 

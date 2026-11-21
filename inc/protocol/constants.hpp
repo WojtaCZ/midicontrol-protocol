@@ -58,6 +58,11 @@ namespace protocol {
 	// this system wrote (protocol v2, A3). The empty payload stays the unconditional clear.
 	static constexpr uint8_t NPI_CLEAR_IF_OWN = 0x01;
 
+	// SIGNAL_INFO flags byte (protocol v2, MsgType 0x34). Receivers read the bytes and bits they know and ignore the
+	// rest; bits 2-7 are reserved and sent as 0. The sender always sends the complete flags byte.
+	static constexpr uint8_t SIGNAL_INFO_SONG_HAS_SECTIONS = 0x01; // bit0 (A6): the song file has verse markers; 0 = the remote hides add-verse
+	static constexpr uint8_t SIGNAL_INFO_BASE_UPDATING     = 0x02; // bit1 (A8, not used yet): the base is updating its firmware
+
 } // namespace protocol
 
 #endif
