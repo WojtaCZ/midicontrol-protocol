@@ -103,7 +103,7 @@ All v2 items are additive: nothing changes meaning, nothing is removed. v2 so fa
 | ACK  | 0x01 | any → any     | `[ackedPacketId]`                           |
 | NAK  | 0x02 | any → any     | `[ackedPacketId, nakReason]`                |
 
-NAK reasons: `0x01` unknown msg, `0x02` invalid payload, `0x03` CRC error, `0x04` busy (receiver or the base's TX path momentarily occupied, retry later; sent by the base when forwarding while the link is up), `0x05` not playing, `0x06` unreachable (base could not forward), `0x07` not found (unknown song code).
+NAK reasons: `0x01` unknown msg, `0x02` invalid payload, `0x03` CRC error, `0x04` busy (receiver or the base's TX path momentarily occupied, retry later; sent by the base when forwarding while the link is up), `0x05` not playing, `0x06` unreachable (base could not forward), `0x07` not found (unknown song code), `0x08` no transfer (protocol v2: `FW_UPDATE_DATA` / `FW_UPDATE_END` arrived while no firmware transfer is active, e.g. the device reset or timed out after `START`; unlike `BUSY` it is final: the sender must not retry, the update has to be started again; a v1 sender treats the unknown reason as final too).
 
 ---
 
@@ -248,7 +248,7 @@ out does not reset it.
 | FW_UPDATE_START  | 0x70 | `[target(1), size(4 LE), crc32(4 LE), version[...]]`|
 | FW_UPDATE_DATA   | 0x71 | `[offset(4 LE), chunk(≤120 B)]`                     |
 | FW_UPDATE_END    | 0x72 | *(empty)* — finalize, verify, apply                  |
-| FW_UPDATE_STATUS | 0x73 | `[statusCode]` — device → PC progress/result         |
+| FW_UPDATE_STATUS | 0x73 | `[statusCode]` — device → PC progress/result; the PC answers `ACK`, the device resends the same PacketId until ACKed (v2) |
 | ENTER_BOOTLOADER | 0x74 | *(empty)* — base reboots into its USB-CDC bootloader |
 
 FW_UPDATE_STATUS codes: `0x00` ready, `0x01` in-progress (**reserved, no device sends it**; receivers filter it out), `0x02` CRC OK (applying), `0x03` CRC fail, `0x04` write error, `0x05` bad size.
@@ -257,6 +257,14 @@ Receiver rules (`FwReceiver`, see the bootloader README "Firmware update protoco
 
 - Every `FW_UPDATE_*` frame gets `ACK` or `NAK`; `FW_UPDATE_STATUS` follows where the step has a result: `READY` after `START`;
   `CRC_OK` / `CRC_FAIL` / `WRITE_ERROR` / `BAD_SIZE` after `END`; `WRITE_ERROR` / `BAD_SIZE` after a failed chunk.
+- `FW_UPDATE_STATUS` is acknowledged like any other frame (protocol v2): the PC answers `ACK` (payload = the PacketId of the
+  status). The device keeps the status until that `ACK` arrives and resends the same frame (same PacketId) every
+  `RETRY_TIMEOUT_MS` (500 ms), at most `MAX_RETRIES` (3) times; a newer status replaces an unACKed older one. A missing
+  `ACK` never aborts the update: after the last retry the device simply drops the status. After `CRC_OK` the device
+  applies the image at once (base: waits at most 250 ms for the `ACK`; remote: reboots 500 ms after staging), so that
+  last status may go unACKed. The PC treats a repeated status as a duplicate (same byte).
+- `FW_UPDATE_DATA` / `FW_UPDATE_END` without an active transfer are answered `NAK NO_TRANSFER` (v2; v1 devices sent `NAK BUSY`,
+  which the PC retried), except an `END` repeated after a successful commit, which is ACKed again.
 - `START`'s `target` byte must equal the receiving node, else `NAK` + `BAD_SIZE`. The image size must fit the application
   region (base 94 KB = `0x17800`, remote 110 KB).
 - Chunks must arrive in order. A retransmitted chunk is ACKed again and not written twice; a gap or partial overlap is

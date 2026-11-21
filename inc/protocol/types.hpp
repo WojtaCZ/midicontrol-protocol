@@ -64,6 +64,7 @@ namespace protocol {
 		NOT_PLAYING        = 0x05, // command needs active playback (REPLAY_ANCHOR)
 		UNREACHABLE        = 0x06, // base: destination node not connected, packet not forwarded
 		NOT_FOUND          = 0x07, // PC: song code not in library
+		NO_TRANSFER        = 0x08, // FW_UPDATE_DATA/END without an active transfer (never START-ed, or the device reset): final, not retried
 	};
 
 	struct Packet {
