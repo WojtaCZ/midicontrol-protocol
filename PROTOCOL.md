@@ -159,11 +159,17 @@ The PC answers `NAK NOT_PLAYING` when nothing is playing.
 
 | Type           | Code | Direction              | Payload |
 |----------------|------|------------------------|---------|
-| GET_SONG_LIST  | 0x20 | Remote/Base → PC       | *(empty)* or `[offset]` — index of the first entry, default 0 |
+| GET_SONG_LIST  | 0x20 | Remote/Base → PC       | *(empty)*, `[offset]` or `[offset_lo, offset_hi]` — index of the first entry in the PC's sorted list (u16 LE; 1 byte = offset < 256; empty = 0). Senders use 2 bytes only when the offset is >= 256 (protocol v2 PC; a v1 PC reads byte 0 only, so it serves just the first 256 songs correctly) |
 | SONG_LIST_RESP | 0x21 | PC → requester         | `[hasMore, "code;code;..."]` — ASCII codes separated by `;`, no terminator |
 
-The PC fills a page up to the payload limit; the requester asks for the next page with
-`offset = previous offset + entries received` while `hasMore != 0`.
+The PC fills a page up to the payload limit. Paging rules:
+
+- The requester advances its offset by the **number of codes received** in the previous response (count the
+  `;`-separated entries), never by the number it displayed or kept (RF-18). A requester that holds only a window of
+  the list (the base keeps 24 entries) may also request an earlier offset to scroll back.
+- An offset at or past the end of the list is answered with `[0x00]` and an empty list.
+- `hasMore`: bit 0 = more entries follow the page; bits 1-7 are reserved and **must be 0** (the base tests `!= 0`).
+- There is no fixed cap on the list length in the protocol; it is bounded only by the song code rule (Q1-2).
 
 ---
 
