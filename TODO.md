@@ -3,7 +3,7 @@
 Source: audit/OWNER-ANSWERS.md; plan: plans/2026-11-16-owner-answers-impl.md. Work stays on branch audit/step4-manual.
 
 This section designs phase A (A1-A9). Other task lists (B, C, D, E in the PC, base and remote TODO.md files) refer to these IDs.
-Paths: base = midicontrol-fw, remote = midicontroller-fw, PC = midicontrolpy-sw (C++), boot = midicontrol-bootloader
+Paths: base = midicontrol-fw, remote = midicontroller-fw, PC = midicontrol-sw (C++), boot = midicontrol-bootloader
 (shared lib, pinned in both fw repos as lib/bootloader; bump is C10). Line numbers are from branch audit/step4-manual on 2026-11-16.
 
 ### Shared design: ONE protocol version bump (v1 -> v2) for A1-A9
@@ -33,7 +33,7 @@ Paths: base = midicontrol-fw, remote = midicontroller-fw, PC = midicontrolpy-sw 
   - Unknown MsgType to the base -> NAK UNKNOWN_MSG (router.cpp:449 default); to the remote -> NAK UNKNOWN_MSG (main.cpp default). So the PC must not send a new MsgType to a v1 peer (gate on PROTO_VER), not because it breaks anything but because it would produce a NAK and a log line.
   - Longer payloads on existing types are read by old code as the old prefix: old base KEEPALIVE ignores the payload; old PC STATUS parser takes `size() >= 3` (comm.cpp:781); old remote reads KEEPALIVE byte 0 and 1 only (link.cpp:186-200, "an older remote reads byte 0 only" PROTOCOL.md:196). VERIFY the old base really ignores a PC KEEPALIVE payload (router.cpp:422 sends KEEPALIVE_ACK without reading it: confirmed by reading, still add a host test).
   - NOW_PLAYING_INFO with an unknown length (<5, not 0) is silently ignored by the old base (display.cpp applyNowPlaying `len < 5 return`). So the new 1-byte clear must be sent only to a v2 base, or the stop would not clear at all.
-- Files that change for the bump in the protocol repo: `inc/protocol/{types,constants,info}.hpp`, `src/` if any table of names exists (PC has its own src/protocol/names.cpp for MsgType names, add SIGNAL_INFO), `PROTOCOL.md` (tables listed above, a new "Protocol version" section), `INDICATOR-BUS.md` (A3), `CLAUDE.md` if it lists IDs. Then bump the submodule/copy in: base lib/protocol, remote lib/protocol, PC include/midicontrol/protocol + src/protocol (VERIFY how the PC copy is synced: `ls -la midicontrolpy-sw/include/midicontrol/protocol` and any sync script; the worktrees under wt/ have their own copies, ignore them).
+- Files that change for the bump in the protocol repo: `inc/protocol/{types,constants,info}.hpp`, `src/` if any table of names exists (PC has its own src/protocol/names.cpp for MsgType names, add SIGNAL_INFO), `PROTOCOL.md` (tables listed above, a new "Protocol version" section), `INDICATOR-BUS.md` (A3), `CLAUDE.md` if it lists IDs. Then bump the submodule/copy in: base lib/protocol, remote lib/protocol, PC include/midicontrol/protocol + src/protocol (VERIFY how the PC copy is synced: `ls -la midicontrol-sw/include/midicontrol/protocol` and any sync script; the worktrees under wt/ have their own copies, ignore them).
 - Test host for the protocol repo: it has no tests directory (VERIFY `ls midicontrol-protocol`: inc, src, docs only). Tests live in the consumers: base test/host (gtest), PC tests/ (VERIFY name), bootloader tests/test_main.cpp.
 
 ### A1 Session nonce: base/remote dedup reset on PC hello; re-enable the 2 DISABLED PM-13 tests (Q2-11, Q3-3)

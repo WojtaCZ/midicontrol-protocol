@@ -1,8 +1,8 @@
-<!-- COPY of midicontrol-fw/docs/HARDWARE.md. Do not edit here: edit the main copy, then run midicontrolpy-sw/tools/sync-system-doc.sh -->
+<!-- COPY of midicontrol-fw/docs/HARDWARE.md. Do not edit here: edit the main copy, then run midicontrol-sw/tools/sync-system-doc.sh -->
 
 # MIDIcontrol base station: hardware
 
-Expected system behaviour: see docs/SYSTEM.md (main copy in midicontrolpy-sw).
+Expected system behaviour: see docs/SYSTEM.md (main copy in midicontrol-sw).
 
 Status 2026-11-12. Owner decisions applied: D10 (BLE module), D11 (source of truth), D12 (SSR).
 
