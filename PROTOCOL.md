@@ -114,7 +114,7 @@ NAK reasons: `0x01` unknown msg, `0x02` invalid payload, `0x03` CRC error, `0x04
 |------------------|------|-----------------|---------|
 | PLAY_SONG        | 0x10 | Remote/Base → PC | ASCII song code, e.g. `"406A"` (rule below; the frame bound is `MAX_SONG_CODE_LEN` = 8 chars). No terminator required; a trailing `0x00` is tolerated |
 | STOP_SONG        | 0x11 | Remote/Base → PC | *(empty)* or `[mode]`: `0x00` stop, `0x01` pause (the PC may treat pause as stop) |
-| RECORD_SONG      | 0x12 | –               | *(reserved)* |
+| RECORD_SONG      | 0x12 | Base → PC       | `[0x01]` start, `[0x00]` stop *(protocol v2, A7)*; empty = start. ACKed; see "Recording" below |
 | NOW_PLAYING_INFO | 0x13 | PC → Base       | see below |
 | REPLAY_ANCHOR    | 0x14 | Remote → PC     | *(empty)* — **add verse** |
 
@@ -174,12 +174,30 @@ The PC fills a page up to the payload limit. Paging rules:
 
 ---
 
+### Recording (A7, protocol v2)
+
+Recording starts and stops only from the base (its `Nahraj` item). The base sends `RECORD_SONG [0x01]` to the PC
+(reliable, `PacketId` as usual); a v1 PC answers `NAK UNKNOWN_MSG` (no recording from the base). The PC answers:
+
+- `NAK BUSY` when a recording is running or starting, a song is playing or about to play, or any device is being
+  updated (the same check that refuses `PLAY_SONG`); the base shows its busy text and sends nothing more;
+- `ACK` otherwise, and starts the recorder asynchronously (the organ warm-up takes seconds). Only when the recorder
+  is really running the PC sends `SIGNAL_RECORDING` (empty, reliable, signal group 2) to the **base and the remote**
+  (the remote only if it reports `PROTO_VER >= 2`; the base also observes the copy forwarded to the remote).
+  If the start fails or is cancelled, the PC sends `SIGNAL_STOPPED` to the base instead.
+
+`RECORD_SONG [0x00]` ends the recording (ACKed; a no-op when nothing records). The end of a recording is signalled by
+`SIGNAL_STOPPED` to the base and the remote, also when the recorder dies on its own or the PC shuts down. While a
+recording runs the PC answers `PLAY_SONG` with `NAK BUSY`, and a `STOP_SONG` **from the remote does not end it** (ACKed,
+ignored): only the base ends a recording. `SIGNAL_RECORDING` is remembered and resent in the PC's remote resync like
+`SIGNAL_PLAYING`.
+
 ### Playback signals (0x3x) — PC → Remote
 
 | Type             | Code | Payload |
 |------------------|------|---------|
 | SIGNAL_PLAYING   | 0x30 | ASCII song code that started playing |
-| SIGNAL_RECORDING | 0x31 | *(reserved)* |
+| SIGNAL_RECORDING | 0x31 | *(empty)* *(protocol v2, A7)* — the recorder is running; a remote ignores any payload. The end is `SIGNAL_STOPPED` |
 | SIGNAL_STOPPED   | 0x32 | *(empty)* — playback ended or was stopped |
 | SIGNAL_ANCHOR    | 0x33 | null-terminated ASCII label, max 127 bytes + `\0` |
 | SIGNAL_INFO      | 0x34 | `[flags u8]` *(protocol v2)* — state flags of the current song/system, see below |
