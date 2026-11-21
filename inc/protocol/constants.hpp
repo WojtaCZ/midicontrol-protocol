@@ -61,7 +61,7 @@ namespace protocol {
 	// SIGNAL_INFO flags byte (protocol v2, MsgType 0x34). Receivers read the bytes and bits they know and ignore the
 	// rest; bits 2-7 are reserved and sent as 0. The sender always sends the complete flags byte.
 	static constexpr uint8_t SIGNAL_INFO_SONG_HAS_SECTIONS = 0x01; // bit0 (A6): the song file has verse markers; 0 = the remote hides add-verse
-	static constexpr uint8_t SIGNAL_INFO_BASE_UPDATING     = 0x02; // bit1 (A8, not used yet): the base is updating its firmware
+	static constexpr uint8_t SIGNAL_INFO_BASE_UPDATING     = 0x02; // bit1 (A8): sent by the base before it reboots into its bootloader; the remote shows "Zakladna: aktualizace"
 
 } // namespace protocol
 

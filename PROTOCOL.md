@@ -199,8 +199,17 @@ like any other type; a v1 remote answers `NAK UNKNOWN_MSG`, so the PC sends it o
 | Bit | Name | Meaning |
 |-----|------|---------|
 | 0 | `SONG_HAS_SECTIONS` | the song that plays has verse markers (sections). 0 = it has none: the remote hides add-verse and does not send `REPLAY_ANCHOR` |
-| 1 | `BASE_UPDATING` | *(reserved for A8, not sent yet)* the base is updating its firmware |
+| 1 | `BASE_UPDATING` | the base is about to reboot into its bootloader for a firmware update; the remote shows "Zakladna: aktualizace" instead of "Odpojeno" |
 | 2-7 | | reserved, 0 |
+
+`BASE_UPDATING` (A8) is sent by the **base** itself, from its `ENTER_BOOTLOADER` handler right after the ACK and once
+more 100 ms later (no ACK wait, best effort; the base resets after 250 ms and sends no `KEEPALIVE` in between). The flags
+byte of this message is `0x03` (the base does not know the song flag, so it sends the default "has sections"). A remote
+that never receives it (lost, or a v1 remote that answers `NAK UNKNOWN_MSG`, which the base ignores) just shows the link
+loss. The remote keeps the state until the first `KEEPALIVE` from the base after it is back, a `SIGNAL_INFO` with the bit
+clear (the PC's resync) or 5 minutes, whichever is first. The PC never sets bit 1, and its flag bytes must not clear or set
+it on their own account: it keeps sending bit 0 only. While any device is being updated the PC answers `PLAY_SONG` (and,
+from A7, `RECORD_SONG`) with `NAK BUSY`.
 
 Sequence: the PC sends `SIGNAL_INFO` right after `SIGNAL_PLAYING` of a song and before its first `SIGNAL_ANCHOR`, and
 repeats it after the `SIGNAL_PLAYING` of a resync. The remote resets `SONG_HAS_SECTIONS` to "has sections" on
