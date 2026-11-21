@@ -91,7 +91,15 @@ Escaping applies to Length through CRC. Worst case on the wire is `2 + 134 * 2 =
 `PROTO_VER` (0x08, u8). A node that does not send the tag speaks v1 (the wire format before the version existed).
 The PC reads it from `GET_INFO` per peer and enables each new behaviour only when the peers involved report v2 (a feature
 between two peers is active only when both ends are v2; the base relays). Base v2 + remote v1 and the reverse are valid.
-All v2 items are additive: nothing changes meaning, nothing is removed. v2 so far: session nonce in `KEEPALIVE`, duplicate window, `ORGAN_SRC` INFO tag, `SIGNAL_INFO` (0x34).
+All v2 items are additive: nothing changes meaning, nothing is removed. v2 additions (each active only when the peers involved report v2):
+- session nonce in `KEEPALIVE` and the 8-id duplicate window
+- `ORGAN_SRC` INFO tag
+- `SIGNAL_INFO` (0x34), including the `BASE_UPDATING` flag sent by the base before it resets for a firmware update
+- `KEEPALIVE_ACK` boot id and the 7-byte `STATUS_RESP`
+- `NPI_CLEAR_IF_OWN` (indicator number cleared only if this node set it)
+- `FW_UPDATE_STATUS` ACK and retry, and NAK reason `NO_TRANSFER` (0x08)
+- `GET_SONG_LIST` u16 offset
+- `RECORD_SONG` Base to PC and `SIGNAL_RECORDING` handling
 
 ---
 
