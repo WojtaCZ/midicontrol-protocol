@@ -164,16 +164,16 @@ power policy and serves a status web page.
 | SYS-USE-12 | New PLAY while playing (or paused) replaces the current song | implemented (paused case depends on SYS-USE-09) | PC comm.cpp:1086 `doPlay` |
 | SYS-USE-13 | No tempo change and no transposition, anywhere (D6) | implemented | none present; do not add |
 | SYS-USE-14 | Recording is a required feature; see sec. 4.13 SYS-REC (D6, D9) | partial | see SYS-REC |
-| SYS-USE-15 | Base OLED: menu Prehraj / Nahraj / Nastaveni; "Odpojeno" overlay without PC; OLED sleeps after 30 s, wakes on input or overlay change | partial | base menu.cpp; "Nahraj" is shown but its callback is empty (menu.cpp:453, UI-1, gap 15). Pending (step 2): NowPlaying is dismissed on PC loss; "Zastavuji" times out after 5 s to the main menu (SM-1, Q-D-12); a failed song list, play or stop shows why: "PC neodpovida", "PC zaneprazdneno", "PC nedostupne" (PM-1, Q-D-13) |
+| SYS-USE-15 | Base OLED: menu Prehraj / Nahraj / Nastaveni; "Odpojeno" overlay without PC; OLED sleeps after 30 s, wakes on input or overlay change | partial | base menu.cpp; "Nahraj" starts/stops a recording and shows the state (C3, RecordScreen in menu.cpp: Priprava / Nahravam + Enter = Stop / Zastavuji / Zaneprazdneno / PC nema nahravani / Nahravani selhalo / Nahravani nelze: hraje). Pending (step 2): NowPlaying is dismissed on PC loss; "Zastavuji" times out after 5 s to the main menu (SM-1, Q-D-12); a failed song list, play or stop shows why: "PC neodpovida", "PC zaneprazdneno", "PC nedostupne" (PM-1, Q-D-13) |
 | SYS-USE-16 | Song folder rescan every 60 s | implemented, not bench-verified | PC web_server.cpp `kRescanMs` (status page + songcheck); GET_SONG_LIST and PLAY scan the folder on demand |
 | SYS-USE-17 | Indicator shows a song as 4 digit positions, each 0-9 or blank, songs up to **1999** (thousands digit blank or 1, D23) + letter A-D or blank, verse as 2 digit positions (D7, sec. 5) | differs from code (gap) | base `setSong()` (display.cpp:264) caps at 1999 but has no caller; the live path display.cpp:211 `applyNowPlaying` passes any thousands digit (US-6, gap 32). PC `fromSongCode` caps at 1999 since step 2 (bab7e84, Q1-2 a) |
 | SYS-USE-18 | Digits are ones-first and right-aligned as the V2 text says; V2's "song 12" example is a typo. Shifted digits in a song file are authoring mistakes (512.mid: verse in the tens position, 513.mid: song shifted left): the PC right-aligns them and songcheck should warn (D24) | implemented (songcheck warning 2026-11-12: songcheck_warns_*) | PC display.cpp |
 | SYS-USE-19 | Song without a usable display anchor: PC uses the song code from the file name for the indicator AND flags the file (songcheck warning) (D15) | implemented, not bench-verified | PC playback.cpp:110 fallback; songcheck flags "empty display anchor" / "no display anchors" |
-| SYS-USE-20 | Song config without stops: PC sends a configured **default registration** at song start (not "leave stops as they are") (D16) | NOT IMPLEMENTED (gap) | PC organ/stops: no default registration setting |
+| SYS-USE-20 | Song config without stops: PC sends a configured **default registration** at song start (not "leave stops as they are") (D16) | implemented, not bench-verified | PC organ.cpp / stops_file.cpp `planFor`: `[ORGAN] DefaultStops=1,5,12` (empty = organ unchanged); a song file (even empty = all off) wins; `StopsEnabled=false` wins; log/status text `default 1 5 12`; web editor shows "výchozí". Content of the list is the owner's (O-14) |
 | SYS-USE-21 | Resume: a resume command from the remote or base continues the paused song at the same spot (same section, same position); SIGNAL_PLAYING sent again (D6) | NOT IMPLEMENTED (gap) | no resume message in PROTOCOL.md, no UI |
 | SYS-USE-22 | Song code rule: 1-4 digits, value at most 1999, plus an optional letter A-D. Every unit checks it: the remote on entry and before PLAY_SONG; the PC at every entry point (PLAY_SONG -> NAK INVALID_PAYLOAD, console/CLI, file lookup, song list, stops editor, songcheck); the base on the indicator path. The song list offers only files whose name is a valid code (Q1-2 a, 2026-11-14) | partial | step 2: PC `songs::validCode` (bab7e84, 5c42931), remote 5ecea01; base indicator path not yet (gap 32). B4 (Q2-15): leading zeros are ignored on the PC ("012" = "12", `songs::normalizeCode`, config `[FILES] SongCodeNormalise`, default true); songcheck warns about a leading-zero file name and about two files with the same normalised code. The frame bound MAX_SONG_CODE_LEN stays 8 |
 | SYS-USE-23 | The base is a full player: add verse from the base (P1-6) and the whole song list (the 32-song cap goes, or the list pages like the remote's). Until then the base shows a message when the list is cut at 32 (P1-7 a) (Q1-11 b, 2026-11-14) | NOT IMPLEMENTED (gap) | base menu.cpp; waits for the bench stack watermark (RAM 95%), gap 39 |
-| SYS-USE-24 | Base NowPlaying screen: a turn of the encoder selects Stop or "Pridat sloku" (add verse); a press runs the selected action (Q-UI2-4, 2026-11-15) | NOT IMPLEMENTED (gap) | base menu.cpp NowPlaying; gap 40 |
+| SYS-USE-24 | Base NowPlaying screen: a turn of the encoder selects Stop or "Pridat sloku" (add verse); a press runs the selected action (Q-UI2-4, 2026-11-15) | IMPLEMENTED (C4; the second button appears after the first SIGNAL_ANCHOR; REPLAY_ANCHOR sent) | base menu.cpp NowPlaying; gap 40 |
 | SYS-USE-25 | Base power-on splash closes by itself after 3 s, unless the user already pressed a key: then it stays until Enter (P1-8) | implemented, not bench-verified | base `splashguard::Guard` (step 2, ee890a6), tests SplashGuard.*. Up/Down alone no longer close it (Q-D-1) |
 
 ### 4.4 Link loss (BLE)
@@ -196,7 +196,7 @@ power policy and serves a status web page.
 | SYS-PC-02 | Remote commands to an absent PC -> NAK UNREACHABLE | implemented | base router |
 | SYS-PC-03 | PC lost mid-song (USB gone, PC dead, keepalive timeout): base IMMEDIATELY sends All Notes Off (CC120 + CC123, 16 ch) to DIN AND switches the SSR off (D1). Fires only on the transition PC present -> PC lost; manual use of the base with no PC ever present keeps power (D19). This is the backstop for the PC-owned power policy (D5) | implemented (2026-11-12; DIN half unverified until SYS-NOTE-05; step-2 changes not bench-verified) | base router.cpp logChanges + logic/recovery.hpp PcLossGuard; tests host PcLossGuard.*, hw test_pc_loss.py. Pending (step 2, 64ce11c): the loss is latched, only a received PC packet restores the PC, on a wrap-safe uint32 ms clock (BF-1, Q-D-11) |
 | SYS-PC-04 | PC loses USB (base reset): playback stopped, organ state "unknown"; reconnects on USB return | implemented | PC comm.cpp:995 (`SerialLost`) |
-| SYS-PC-05 | PC service shutdown (SIGTERM): stop, clear, SIGNAL_STOPPED, organ off. Interactive Ctrl-C may exit without cleanup; SYS-PC-03 and SYS-PWR-07 cover it | implemented | PC comm.cpp:1010 (`Shutdown`) |
+| SYS-PC-05 | PC service shutdown (SIGTERM, SIGINT, SIGHUP, interactive quit or EOF): stop, clear, SIGNAL_STOPPED, organ off, all through the same path (tested end to end in tools/systest/test_virtual_shutdown.py); SYS-PC-03 and SYS-PWR-07 cover it | implemented | PC comm.cpp (`Kind::Shutdown`), main.cpp |
 | SYS-PC-06 | systemd watchdog ping every 5 s only if worker threads progressed within 10 s | implemented, not bench-verified | PC sd_notify |
 | SYS-PC-07 | When the base declares the PC lost, it forgets the PC's last PacketId, so the first frame of a restarted PC is executed, not only re-ACKed (Q1-8 b, 2026-11-14) | implemented, not bench-verified | base (step 2, fd11669). Residual: a PC restart faster than the 6 s loss timeout is not a loss; the PC's random PacketId start (92a5228, pending Q-D-14) leaves a 1/256 collision (gap 34) |
 
@@ -275,13 +275,13 @@ power policy and serves a status web page.
 | SYS-WEB-02 | "Prehled" (Czech): health, now playing, stops; "Pokrocile" (English): debug | implemented, not bench-verified | PC web_page |
 | SYS-WEB-03 | Controller dot green only if STATUS_RESP <= 15 s old | implemented, not bench-verified | PC status |
 | SYS-WEB-04 | Stops editor writes `<CODE>.conf` | implemented, not bench-verified | PC stops_file |
-| SYS-WEB-05 | No authentication, no Host check: accepted. Assumption: the church LAN is trusted; page stays open (D4) | implemented | PC http.cpp |
+| SYS-WEB-05 | No authentication; the church LAN is trusted and the page stays open (D4). Writes (stops, firmware, fault ack) are POST/PUT only and refused (403) unless Host is an IP address, localhost or in `[WEB] AllowedHosts` and any Origin matches Host (CSRF / DNS rebinding, Q2-25, B7). No play/stop/organ controls on the page | implemented | PC http.cpp, diag_api.cpp |
 
 ### 4.13 Recording (new group, D6, D9)
 
 | ID | Expected behaviour | Status vs code | Where / note |
 |---|---|---|---|
-| SYS-REC-01 | Recording is started and stopped **from the base only** (menu); the remote has no recording control and no record menu entry (D9). PC confirms with SIGNAL_RECORDING; base and remote show "recording" (remote: info screen "Nahravani", D10; unknown state "Stav neznamy", D7) | partial | base menu "Nahraj" exists; RECORD_SONG / SIGNAL_RECORDING "reserved" in PROTOCOL.md |
+| SYS-REC-01 | Recording is started and stopped **from the base only** (menu); the remote has no recording control and no record menu entry (D9). PC confirms with SIGNAL_RECORDING; base and remote show "recording" (remote: info screen "Nahravani", D10; unknown state "Stav neznamy", D7) | partial | base side done (A7, C3): menu "Nahraj" sends RECORD_SONG, the recording screen follows SIGNAL_RECORDING/SIGNAL_STOPPED; bench check and PC side open |
 | SYS-REC-02 | PC records the organ's MIDI from DIN (via base USB-MIDI in) into a new song file in the song store | partial | PC `record` spawns arecordmidi (comm.cpp:887); DIN-in path never verified |
 | SYS-REC-03 | Every indicator-bus frame seen during recording (from the base or any manual controller) is written into the file at its time position as the same embedded display SysEx the player parses today | NOT IMPLEMENTED (gap) | base echoes bus frames as SysEx to USB; PC does not merge them into the file |
 | SYS-REC-04 | A recorded file plays back like any other song: sections from the recorded anchors, songcheck-clean | NOT IMPLEMENTED (gap) | depends on SYS-REC-03 |
@@ -467,7 +467,7 @@ nothing. Schematics showing an RN4870 are pre-adapter (D10).
 | Bez odpovedi | No answer (retries exhausted) |
 | Chybny kod | Invalid song code |
 | Nejvyse 1999 | At most 1999 (remote, song code above the cap, Q1-2 a) |
-| Pridat sloku | Add verse (base NowPlaying action, SYS-USE-24, not implemented yet) |
+| Pridat sloku | Add verse (base NowPlaying action, SYS-USE-24) |
 | Zadne pisne | No songs |
 | Predehra | Prelude |
 | Sloka n / Sloka n +k | Verse n / verse n replayed k extra times (PC label; the OLEDs show "Sloka: n" / "Sloka: n (xk)", "Predehra (xk)") |
@@ -496,7 +496,7 @@ nothing. Schematics showing an RN4870 are pre-adapter (D10).
 | Baterie: Napeti / Uroven / Nabiji / Nabito / Nenabiji / Vybiji | Battery page (remote) |
 | Verze FW: Revize / Vetev / Datum / Cas | Firmware version page |
 | Modul: OK / OK, bez RST / neodpovida / mlci | BLE module self-test, Bluetooth page: OK / OK but the reset line does not work / no reply / silent (Q-TG-4) |
-| Ident. MIDI / LED / Displej | Base settings: MIDI identification, status LED, church board page |
+| Ident. MIDI / LED / Displej | Base settings (Ident. MIDI is in the Nastaveni > Servis submenu since C7): MIDI identification, status LED, church board page |
 | Stisk: Nastaveni | Press: settings (hint on the remote's Odpojeno overlay) |
 | MIDIControl BASE / CONTROLLER | Power-on splash, English product name (Q-TG-1) |
 
