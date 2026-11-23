@@ -22,6 +22,7 @@ namespace protocol::info {
 		UPTIME_MS     = 0x05, // u32: ms since this boot (wraps after 49 days)
 		RESET_CAUSE   = 0x06, // u8: (RCC_CSR >> 24) & 0xFE, bit1 OBL, 2 PIN, 3 POWER (BOR/PWR), 4 SOFTWARE, 5 IWDG, 6 WWDG, 7 LOWPOWER
 		FAULT_COUNT   = 0x07, // u8: faults since power-on (base: count of the saved fault record, 0 = none)
+		FAULT_LAST    = 0x09, // base: [kind u8, pc u32 LE] of the saved fault record (kind: 1 HardFault, 2 MemManage, 3 BusFault, 4 UsageFault, 5 error, 6 loop stall, 7 NMI, 8 stack overflow); absent when no record. Absent on older firmware
 		PROTO_VER     = 0x08, // u8: wire protocol version this node speaks (PROTOCOL_VERSION); a node that does not send the tag is v1
 
 		// Bluetooth (both nodes)

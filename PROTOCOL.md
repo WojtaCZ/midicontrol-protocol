@@ -267,6 +267,8 @@ device name, pairing state, and node-specific fields (base: display, SSR, ORGAN_
 charger state, USB voltage). Values are little-endian. Every field is optional and a receiver skips unknown tags,
 so new fields need no new message type. A node without `GET_INFO` (older firmware) answers `NAK UNKNOWN_MSG`.
 
+Base tag `FAULT_LAST` (0x09, `[kind u8, pc u32 LE]`) is sent only while the base holds a saved fault record (kind 1 HardFault, 2 MemManage, 3 BusFault, 4 UsageFault, 5 error, 6 loop stall, 7 NMI, 8 stack overflow); with `FAULT_COUNT` it lets the PC show what the last crash was without opening the log port. Older firmware does not send it.
+
 Base tag `ORGAN_SRC` (0x22, u8, v2) says who switched the organ power on: `0` off, `1` on by the PC (`SET_CURRENT` from the PC), `2` on by the base menu, `3` on with unknown source (reserved: the SSR is always off after a base reset). It lets a restarted PC tell its own power-on from a manual one. The last switch-on wins (an explicit `SET_CURRENT 1` from the PC while the menu had it on makes the PC the owner); switching off clears it. A v1 base does not send the tag (the PC then treats a power-on as manual).
 
 ---
