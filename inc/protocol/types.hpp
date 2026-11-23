@@ -15,6 +15,7 @@ namespace protocol {
 		RECORD_SONG        = 0x12,
 		NOW_PLAYING_INFO   = 0x13,
 		REPLAY_ANCHOR      = 0x14, // remote → PC: "add verse" — play the current verse once more after it ends; no payload
+		EMERGENCY_OFF      = 0x15, // remote → base (protocol v2): organ power off + All Notes Off on DIN OUT, done by the base itself; no payload; ACKed
 
 		GET_SONG_LIST      = 0x20,
 		SONG_LIST_RESP     = 0x21,

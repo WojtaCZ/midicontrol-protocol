@@ -125,6 +125,7 @@ NAK reasons: `0x01` unknown msg, `0x02` invalid payload, `0x03` CRC error, `0x04
 | RECORD_SONG      | 0x12 | Base → PC       | `[0x01]` start, `[0x00]` stop *(protocol v2, A7)*; empty = start. ACKed; see "Recording" below |
 | NOW_PLAYING_INFO | 0x13 | PC → Base       | see below |
 | REPLAY_ANCHOR    | 0x14 | Remote → PC     | *(empty)* — **add verse** |
+| EMERGENCY_OFF    | 0x15 | Remote → Base   | *(empty)* — **emergency organ off** *(protocol v2, D14)*; ACKed, never forwarded |
 
 The song code is also the file name on the PC (`406A.mid`). A 16-bit number is not used because it cannot
 express letter variants (406A / 406B). The PC answers an unknown code with `NAK NOT_FOUND`.
@@ -137,6 +138,15 @@ are the same code (pending, Q-W2-8).
 **REPLAY_ANCHOR (add verse)** means "play one more verse": the current verse is played to its end, then
 played once more before playback continues. Each press adds one extra pass; presses accumulate.
 The PC answers `NAK NOT_PLAYING` when nothing is playing.
+
+**EMERGENCY_OFF (emergency organ off)** is sent by the remote when its MF key has been held for 3 s (the shared
+hold-to-confirm screen "Vypnout organ" shows the progress). It is addressed to the base and is handled there, without the
+PC: the base switches the organ relay (SSR) off and sends All Notes Off on all 16 channels on DIN OUT (the same actions as a
+lost PC, SYS-PC-03). The PC is told through the normal status path: the next `STATUS_RESP` carries organ = off
+(`SET_CURRENT` semantics, same byte), and the PC keeps its own state machine (a running song is not stopped by the base).
+The base answers `ACK` (a repeated packet is ACKed again and executed once). An old (v1) base answers `NAK UNKNOWN_MSG`;
+the remote then shows no error beyond the normal result handling and the user can switch the organ off from the menu.
+No payload; a payload is ignored.
 
 **NOW_PLAYING_INFO** drives the church indicator through the base. Not ACKed.
 
