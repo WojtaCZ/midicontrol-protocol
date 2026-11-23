@@ -384,6 +384,7 @@ overwritten are skipped; the node then inserts a `RECORDS_LOST` record with the 
 | 16   | RECORDS_LOST      | number of records dropped |
 | 17   | BLE_MODULE_REBOOT | remote: the BLE module reported `%REBOOT%` on its own (brown-out or module reset, not caused by the remote's own reset); ms since the previous one, `0` = first |
 | 18   | BLE_ERR_CONN      | remote: `%ERR_CONN%` while connected = link lost (supervision timeout); last RSSI in dBm (i8 in the low byte, `0x80` = unknown) |
+| 19   | STAGE_CLEAR_FAILED | remote: the bootloader applied the staged image but could not clear the pending flag in the W25Q (BP-1); the image is copied again on the next power-on. Handed over from the bootloader through a persistent word (TAMP BKP3R, see midicontrol-bootloader `boot/persist.hpp`); arg = 1. An old PC shows an unknown code number |
 
 **Polling rule (PC).** Send `DIAG_GET` when the node's link comes up and then every 10 s while it is alive; never
 during a firmware update; once a response carries `n = 0`, ask again only on the next timer tick. Use the previous

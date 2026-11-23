@@ -45,6 +45,7 @@ namespace protocol::diag {
 		RECORDS_LOST     = 16, // arg = number of lost records
 		BLE_MODULE_REBOOT = 17, // %REBOOT% the module reported on its own (not after our R,1 / RST): brown-out or module reset; arg = ms since the last one (0 = first)
 		BLE_ERR_CONN     = 18, // %ERR_CONN% while connected = link lost by supervision timeout; arg = last RSSI dBm (i8 in the low byte, 0x80 = unknown)
+		STAGE_CLEAR_FAILED = 19, // remote: the bootloader copied the staged image but could not clear the pending flag in the W25Q (BP-1); the same image is copied again on the next power-on (flash wear); arg = 1
 	};
 
 	enum class Level : uint8_t { ERROR = 1, WARNING = 2, INFO = 3, DEBUG = 4 };
