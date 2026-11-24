@@ -46,6 +46,11 @@ namespace protocol {
 		// Diagnostics (see protocol/diag.hpp)
 		DIAG_GET           = 0x80, // PC → node: payload [cursor u16 LE]; ACKed
 		DIAG_RESP          = 0x81, // node → PC: [boot_id u16, next_cursor u16, n u8, n × 12 B record], n ≤ 8
+
+		// BLE pairing confirmation between the base and the remote (see protocol/pairing.hpp); never forwarded to the PC, not ACKed
+		PAIR_REQ           = 0x90, // base → remote: [ver u8, nonceB[4]]
+		PAIR_RSP           = 0x91, // remote → base: [ver u8, nonceR[4]]
+		PAIR_CONFIRM       = 0x92, // both ways: [accept u8, code u32 LE]
 	};
 
 	// FW_UPDATE_STATUS payload codes (single byte)

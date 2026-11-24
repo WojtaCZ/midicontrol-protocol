@@ -354,6 +354,27 @@ flash and erases the staging area (64 KB blocks, typically under 1 s, up to ~8 s
 
 ---
 
+### Pairing confirmation (0x9x) — Base ↔ Remote only
+
+| Type         | Code | Direction       | Payload |
+|--------------|------|-----------------|---------|
+| PAIR_REQ     | 0x90 | Base → Remote   | `[ver u8 = 1, nonceB[4]]` |
+| PAIR_RSP     | 0x91 | Remote → Base   | `[ver u8 = 1, nonceR[4]]` |
+| PAIR_CONFIRM | 0x92 | both ways       | `[accept u8, code u32 LE]` — `accept` 1 = Ano, 0 = Ne / timeout / mismatch |
+
+Used only while the user pairs a new base and remote (menu on both devices). After the link is secured the new peer is
+only *pending*: the remote's `peer_guard` and the base pass nothing but these three frames. The base sends `PAIR_REQ`,
+the remote answers `PAIR_RSP` within 5 s; both derive the same 6-digit `code` (FNV-1a over `"MCP1" ‖ nonceB ‖ nonceR`, mod 10^6,
+`protocol/pairing.hpp`) and show it with an Ano/Ne popup. Each side sends `PAIR_CONFIRM` after its own user decided (30 s limit);
+the bond (remote: stored base MAC; base: stored remote MAC) is kept only when both sides confirmed with the same code. Ne, a timeout,
+a code mismatch or a peer that does not answer ends in `K,1`, the module bond being removed (`U,Z`) and, on the remote, the accept list cleared.
+A reconnect of an already bonded pair does not run the handshake. These frames are never ACKed, never forwarded to the PC (they are
+addressed Base ↔ Remote) and never appear on USB; a PC that sees them anyway may ignore them. This is user-intent confirmation on top of
+the modules' Just Works pairing (`SA,2`), not protection against an active man in the middle. No `PROTOCOL_VERSION` change: an old
+peer does not answer `PAIR_REQ` and the pairing ends safely after 5 s.
+
+---
+
 ### Diagnostics (0x8x) — PC → node, node → PC
 
 | Type      | Code | Direction     | Payload |
