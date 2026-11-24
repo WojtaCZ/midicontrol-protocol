@@ -125,7 +125,7 @@ NAK reasons: `0x01` unknown msg, `0x02` invalid payload, `0x03` CRC error, `0x04
 | RECORD_SONG      | 0x12 | Base → PC       | `[0x01]` start, `[0x00]` stop *(protocol v2, A7)*; empty = start. ACKed; see "Recording" below |
 | NOW_PLAYING_INFO | 0x13 | PC → Base       | see below |
 | REPLAY_ANCHOR    | 0x14 | Remote → PC     | *(empty)* — **add verse** |
-| EMERGENCY_OFF    | 0x15 | Remote → Base   | *(empty)* — **emergency organ off** *(protocol v2, D14)*; ACKed, never forwarded |
+| EMERGENCY_OFF    | 0x15 | Remote → Base, Base → PC | *(empty)* — **emergency abort** *(protocol v2, D14; abort 2026-11-24)*; ACKed; the base executes it and forwards it once to the PC |
 
 The song code is also the file name on the PC (`406A.mid`). A 16-bit number is not used because it cannot
 express letter variants (406A / 406B). The PC answers an unknown code with `NAK NOT_FOUND`.
@@ -139,14 +139,19 @@ are the same code (pending, Q-W2-8).
 played once more before playback continues. Each press adds one extra pass; presses accumulate.
 The PC answers `NAK NOT_PLAYING` when nothing is playing.
 
-**EMERGENCY_OFF (emergency organ off)** is sent by the remote when its MF key has been held for 3 s (the shared
-hold-to-confirm screen "Vypnout organ" shows the progress). It is addressed to the base and is handled there, without the
-PC: the base switches the organ relay (SSR) off and sends All Notes Off on all 16 channels on DIN OUT (the same actions as a
-lost PC, SYS-PC-03). The PC is told through the normal status path: the next `STATUS_RESP` carries organ = off
-(`SET_CURRENT` semantics, same byte), and the PC keeps its own state machine (a running song is not stopped by the base).
-The base answers `ACK` (a repeated packet is ACKed again and executed once). An old (v1) base answers `NAK UNKNOWN_MSG`;
-the remote then shows no error beyond the normal result handling and the user can switch the organ off from the menu.
-No payload; a payload is ignored.
+**EMERGENCY_OFF (emergency abort)** is sent by the remote when its MF key has been held for 3 s (the shared
+hold-to-confirm screen "Nouzove stop" shows the progress). The remote then goes to its main menu (player and recording
+screens are closed). It is addressed to the base, which acts **without the PC**: it sends All Notes Off on all 16
+channels on DIN OUT, switches the organ relay (SSR) off (the same actions as a lost PC, SYS-PC-03), clears its own
+playing/recording display state and shows a timed notice ("Preruseno") before going to its main menu. The base answers
+`ACK` (a repeated packet is ACKed again and executed once).
+
+The base **forwards the packet once to the PC** (reliable, ACKed, same retry rules as `PLAY_SONG`) when the PC is alive.
+PC duty on receipt: stop playback and recording at once (a recording is finished and saved as on a normal stop), send
+Note Off / All Notes Off, clear the verse anchors (`REPLAY_ANCHOR` state) and send `SIGNAL_STOPPED` as after a normal
+stop. The PC answers `ACK` (also when nothing was running). A PC that does not know the type answers `NAK UNKNOWN_MSG`;
+the base ignores that (the stuck-note cleanup and relay-off already happened). An old (v1) base answers the remote
+`NAK UNKNOWN_MSG`; the remote ignores it. No payload; a payload is ignored.
 
 **NOW_PLAYING_INFO** drives the church indicator through the base. Not ACKed.
 
